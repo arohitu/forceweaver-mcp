@@ -23,7 +23,7 @@ def get_salesforce_api_client(connection):
     except Exception as e:
         raise ValueError(f"Failed to create Salesforce client: {str(e)}")
 
-def exchange_code_for_tokens(authorization_code, redirect_uri):
+def exchange_code_for_tokens(authorization_code, redirect_uri, code_verifier):
     """Exchange authorization code for access and refresh tokens."""
     token_url = "https://login.salesforce.com/services/oauth2/token"
     
@@ -32,7 +32,8 @@ def exchange_code_for_tokens(authorization_code, redirect_uri):
         'client_id': Config.SALESFORCE_CLIENT_ID,
         'client_secret': Config.SALESFORCE_CLIENT_SECRET,
         'redirect_uri': redirect_uri,
-        'code': authorization_code
+        'code': authorization_code,
+        'code_verifier': code_verifier
     }
     
     response = requests.post(token_url, data=data)

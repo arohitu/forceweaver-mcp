@@ -6,16 +6,24 @@ from app import db
 from config import Config
 import urllib.parse
 import secrets
+import hashlib
+import base64
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/salesforce/initiate')
 def initiate_salesforce_auth():
-    """Initiate the Salesforce OAuth flow."""
+    """Initiate the Salesforce OAuth flow with PKCE."""
     try:
         # Generate a state parameter for security
         state = secrets.token_urlsafe(32)
         session['oauth_state'] = state
+
+        # Generate PKCE code verifier and challenge
+        code_verifier = secrets.token_urlsafe(64)
+        session['code_verifier'] = code_verifier
+        hashed_verifier = hashlib.sha256(code_verifier.encode('utf-8')).digest()
+        code_challenge = base64.urlsafe_b64encode(hashed_verifier).decode('utf-8').replace('=', '')
         
         # Get customer email from query parameters
         customer_email = request.args.get('email')
@@ -31,7 +39,9 @@ def initiate_salesforce_auth():
             'client_id': Config.SALESFORCE_CLIENT_ID,
             'redirect_uri': Config.SALESFORCE_REDIRECT_URI,
             'state': state,
-            'scope': 'api refresh_token'
+            'scope': 'api refresh_token',
+            'code_challenge': code_challenge,
+            'code_challenge_method': 'S256'
         }
         
         auth_url_with_params = f"{auth_url}?{urllib.parse.urlencode(params)}"
@@ -45,10 +55,11 @@ def initiate_salesforce_auth():
 def salesforce_callback():
     """Handle the Salesforce OAuth callback."""
     try:
-        # 1. Verify state parameter
+        # 1. Verify state and get code verifier
         returned_state = request.args.get('state')
-        if not returned_state or returned_state != session.get('oauth_state'):
-            return jsonify({"error": "Invalid state parameter"}), 400
+        code_verifier = session.get('code_verifier')
+        if not returned_state or returned_state != session.get('oauth_state') or not code_verifier:
+            return jsonify({"error": "Invalid state or missing code verifier"}), 400
         
         # 2. Get the authorization code
         code = request.args.get('code')
@@ -60,8 +71,8 @@ def salesforce_callback():
                 "description": error_description
             }), 400
         
-        # 3. Exchange the code for tokens
-        token_response = exchange_code_for_tokens(code, Config.SALESFORCE_REDIRECT_URI)
+        # 3. Exchange the code for tokens using PKCE
+        token_response = exchange_code_for_tokens(code, Config.SALESFORCE_REDIRECT_URI, code_verifier)
         
         access_token = token_response.get('access_token')
         refresh_token = token_response.get('refresh_token')
@@ -126,6 +137,7 @@ def salesforce_callback():
         # 9. Clear session data
         session.pop('oauth_state', None)
         session.pop('customer_email', None)
+        session.pop('code_verifier', None)
         
         # 10. Return success response with API key (only for new customers)
         response_data = {
