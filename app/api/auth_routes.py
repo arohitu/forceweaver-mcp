@@ -13,7 +13,7 @@ auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/salesforce/initiate')
 def initiate_salesforce_auth():
-    """Initiate the Salesforce OAuth flow with PKCE."""
+    """Initiate the Salesforce OAuth flow with PKCE, supporting production and sandbox."""
     try:
         # Generate a state parameter for security
         state = secrets.token_urlsafe(32)
@@ -32,8 +32,18 @@ def initiate_salesforce_auth():
         
         session['customer_email'] = customer_email
         
+        # Determine Salesforce environment
+        environment = request.args.get('environment', 'production').lower()
+        if environment == 'sandbox':
+            auth_url = "https://test.salesforce.com/services/oauth2/authorize"
+            token_url = "https://test.salesforce.com/services/oauth2/token"
+        else:
+            auth_url = "https://login.salesforce.com/services/oauth2/authorize"
+            token_url = "https://login.salesforce.com/services/oauth2/token"
+            
+        session['token_url'] = token_url
+
         # Build the Salesforce authorization URL
-        auth_url = "https://login.salesforce.com/services/oauth2/authorize"
         params = {
             'response_type': 'code',
             'client_id': Config.SALESFORCE_CLIENT_ID,
@@ -58,8 +68,10 @@ def salesforce_callback():
         # 1. Verify state and get code verifier
         returned_state = request.args.get('state')
         code_verifier = session.get('code_verifier')
-        if not returned_state or returned_state != session.get('oauth_state') or not code_verifier:
-            return jsonify({"error": "Invalid state or missing code verifier"}), 400
+        token_url = session.get('token_url') # Get the token URL from the session
+
+        if not returned_state or returned_state != session.get('oauth_state') or not code_verifier or not token_url:
+            return jsonify({"error": "Invalid state, missing code verifier, or missing token URL"}), 400
         
         # 2. Get the authorization code
         code = request.args.get('code')
@@ -72,7 +84,8 @@ def salesforce_callback():
             }), 400
         
         # 3. Exchange the code for tokens using PKCE
-        token_response = exchange_code_for_tokens(code, Config.SALESFORCE_REDIRECT_URI, code_verifier)
+        # The token exchange URL is now dynamic based on the initial environment
+        token_response = exchange_code_for_tokens(code, Config.SALESFORCE_REDIRECT_URI, code_verifier, token_url)
         
         access_token = token_response.get('access_token')
         refresh_token = token_response.get('refresh_token')
@@ -82,7 +95,9 @@ def salesforce_callback():
             return jsonify({"error": "Invalid token response from Salesforce"}), 400
         
         # 4. Get user info to identify the org
-        user_info = get_salesforce_user_info(access_token, instance_url)
+        # The user info endpoint is based on the instance_url returned by Salesforce
+        user_info_url = f"{instance_url}/services/oauth2/userinfo"
+        user_info = get_salesforce_user_info(access_token, user_info_url)
         salesforce_org_id = user_info.get('organization_id')
         
         if not salesforce_org_id:
@@ -138,6 +153,7 @@ def salesforce_callback():
         session.pop('oauth_state', None)
         session.pop('customer_email', None)
         session.pop('code_verifier', None)
+        session.pop('token_url', None)
         
         # 10. Return success response with API key (only for new customers)
         response_data = {
