@@ -12,13 +12,13 @@ def get_salesforce_api_client(connection):
         raise ValueError("Unable to decrypt refresh token")
     
     try:
+        # Corrected Instantiation: Do not pass instance_url or session_id here.
+        # The refresh_token method will populate them automatically.
         sf = Salesforce(
-            instance_url=connection.instance_url,
-            session_id='',  # Will be set by refresh
             consumer_key=Config.SALESFORCE_CLIENT_ID,
             consumer_secret=Config.SALESFORCE_CLIENT_SECRET
         )
-        sf.refresh_token(decrypted_refresh_token)
+        sf.refresh_token(decrypted_refresh_token, instance_url=connection.instance_url)
         return sf
     except Exception as e:
         raise ValueError(f"Failed to create Salesforce client: {str(e)}")
