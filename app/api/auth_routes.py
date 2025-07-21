@@ -66,6 +66,11 @@ def initiate_salesforce_auth():
 def salesforce_callback():
     """Handle the Salesforce OAuth callback."""
     try:
+        current_app.logger.info("=== SALESFORCE CALLBACK STARTED ===")
+        current_app.logger.info(f"Request args: {dict(request.args)}")
+        current_app.logger.info(f"Session data: user_id_for_oauth={session.get('user_id_for_oauth')}, customer_email={session.get('customer_email')}")
+        
+        from flask import current_app
         # 1. Verify state and get code verifier
         returned_state = request.args.get('state')
         code_verifier = session.get('code_verifier')
@@ -180,13 +185,17 @@ def salesforce_callback():
         session.pop('token_url', None)
         
         # 10. Return appropriate response
+        current_app.logger.info(f"=== CALLBACK COMPLETION - web_user_id: {web_user_id} ===")
         if web_user_id:
             # Web dashboard - redirect to dashboard
+            current_app.logger.info("Processing web dashboard redirect...")
             session.pop('user_id_for_oauth', None)
             session.pop('org_nickname', None)
             from flask import flash
             flash('Salesforce organization connected successfully!', 'success')
-            return redirect(url_for('dashboard.salesforce'))
+            redirect_url = url_for('dashboard.salesforce')
+            current_app.logger.info(f"Redirecting to: {redirect_url}")
+            return redirect(redirect_url)
         else:
             # API integration - return JSON
             response_data = {
@@ -203,14 +212,21 @@ def salesforce_callback():
             return jsonify(response_data), 200
     
     except Exception as e:
+        current_app.logger.error(f"=== SALESFORCE CALLBACK ERROR ===")
+        current_app.logger.error(f"Exception: {str(e)}")
+        current_app.logger.exception("Full callback error details:")
         db.session.rollback()
         if session.get('user_id_for_oauth'):
             # Web dashboard error
+            current_app.logger.error("Handling as web dashboard error...")
             from flask import flash
             flash('Failed to connect Salesforce organization. Please try again.', 'error')
-            return redirect(url_for('dashboard.salesforce'))
+            error_redirect = url_for('dashboard.salesforce')
+            current_app.logger.error(f"Error redirect URL: {error_redirect}")
+            return redirect(error_redirect)
         else:
             # API error
+            current_app.logger.error("Handling as API error...")
             return jsonify({"error": f"OAuth callback failed: {str(e)}"}), 500
 
 @auth_bp.route('/customer/status')
