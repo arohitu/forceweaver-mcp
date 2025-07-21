@@ -91,8 +91,13 @@ def salesforce_callback():
         from flask import current_app
         
         current_app.logger.info("=== SALESFORCE CALLBACK STARTED ===")
+        current_app.logger.info(f"Request URL: {request.url}")
+        current_app.logger.info(f"Request Host: {request.headers.get('Host')}")
         current_app.logger.info(f"Request args: {dict(request.args)}")
+        current_app.logger.info(f"Full session contents: {dict(session)}")
+        current_app.logger.info(f"Session ID: {session.get('_id', 'No session ID')}")
         current_app.logger.info(f"Session data: user_id_for_oauth={session.get('user_id_for_oauth')}, customer_email={session.get('customer_email')}")
+        
         # 1. Verify state and get code verifier
         returned_state = request.args.get('state')
         code_verifier = session.get('code_verifier')

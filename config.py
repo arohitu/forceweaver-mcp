@@ -113,3 +113,17 @@ class Config:
     
     # Session configuration
     PERMANENT_SESSION_LIFETIME = 86400  # 24 hours
+    
+    # Session cookie configuration for cross-subdomain support
+    @classmethod 
+    def get_session_cookie_domain(cls):
+        """Get the appropriate session cookie domain for the environment"""
+        if cls.IS_STAGING:
+            return '.forceweaver.com'  # Allow cookies across staging-* subdomains
+        else:
+            return '.forceweaver.com'  # Allow cookies across production subdomains
+    
+    # Session cookie settings
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SECURE = True  # Ensure HTTPS only
+    SESSION_COOKIE_SAMESITE = 'Lax'  # Allow cross-subdomain requests
