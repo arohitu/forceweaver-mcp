@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}API Keys - ForceWeaver{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">API Key Management</h1>
+    {% if customer and customer.salesforce_connection and not customer.api_key %}
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <form action="{{ url_for('dashboard.create_api_key') }}" method="POST" class="d-inline">
+            {{ csrf_token() }}
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle"></i> Generate API Key
+            </button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+{% if not customer or not customer.salesforce_connection %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    <strong>Salesforce Connection Required</strong>
+    <p class="mb-0">You need to connect your Salesforce organization before you can generate API keys.</p>
+    <a href="{{ url_for('dashboard.salesforce') }}" class="btn btn-primary btn-sm mt-2">
+        <i class="bi bi-cloud-plus"></i> Connect Salesforce
+    </a>
+</div>
+
+{% elif customer.api_key %}
+<!-- API Key exists -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-key"></i> API Key Active
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>API Key Name:</strong><br>
+                        {{ customer.api_key.name or 'Default API Key' }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Status:</strong><br>
+                        {% if customer.api_key.is_active %}
+                            <span class="badge bg-success">Active</span>
+                        {% else %}
+                            <span class="badge bg-danger">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <strong>Created:</strong><br>
+                        {{ customer.api_key.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Last Used:</strong><br>
+                        {% if customer.api_key.last_used %}
+                            {{ customer.api_key.last_used.strftime('%B %d, %Y at %I:%M %p') }}
+                        {% else %}
+                            <span class="text-muted">Never used</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="alert alert-warning">
+                    <i class="bi bi-shield-exclamation"></i>
+                    <strong>Security Notice:</strong> Your API key is hidden for security. 
+                    If you need to view it again, you'll need to generate a new one.
+                </div>
+            </div>
+            <div class="card-footer">
+                <form action="{{ url_for('dashboard.revoke_api_key') }}" method="POST" class="d-inline">
+                    {{ csrf_token() }}
+                    <button type="submit" class="btn btn-danger" 
+                            onclick="return confirm('Are you sure you want to revoke this API key? This will immediately disable all AI agent access.')">
+                        <i class="bi bi-x-circle"></i> Revoke API Key
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-terminal"></i> API Usage</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Use your API key to authenticate AI agent requests:</p>
+                
+                <div class="mb-3">
+                    <label class="form-label small"><strong>Endpoint:</strong></label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control font-monospace" 
+                               value="https://{% if config.IS_STAGING %}staging-{% endif %}api.forceweaver.com/api/mcp/health-check" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard(this.previousElementSibling)">
+                            <i class="bi bi-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label small"><strong>Method:</strong></label>
+                    <code class="d-block">POST</code>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label small"><strong>Authorization Header:</strong></label>
+                    <code class="d-block">Bearer YOUR_API_KEY</code>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Documentation</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">Available endpoints:</p>
+                <ul class="small">
+                    <li><code>GET /api/mcp/tools</code> - List available tools</li>
+                    <li><code>POST /api/mcp/health-check</code> - Run health check</li>
+                    <li><code>GET /api/mcp/status</code> - Service status</li>
+                </ul>
+                <p class="text-muted small">All requests require the API key in the Authorization header.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- No API Key exists -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-plus-circle"></i> Generate Your API Key
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Generate a secure API key to enable AI agents to access your Salesforce health check services.
+                </p>
+                
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Your API key will:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Enable secure access to your Salesforce health check API</li>
+                        <li>Be shown only once for security reasons</li>
+                        <li>Allow unlimited health check requests</li>
+                        <li>Be tied specifically to your connected Salesforce org</li>
+                    </ul>
+                </div>
+                
+                <form action="{{ url_for('dashboard.create_api_key') }}" method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control", placeholder="e.g., Production API Key, AI Agent Access, etc.") }}
+                        {% if form.name.errors %}
+                            <div class="text-danger small">
+                                {% for error in form.name.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-shield-check"></i> Security</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Your API key is secured with:</p>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-lock text-success"></i> Secure random generation</li>
+                    <li><i class="bi bi-hash text-success"></i> Hashed storage (non-reversible)</li>
+                    <li><i class="bi bi-eye-slash text-success"></i> One-time display</li>
+                    <li><i class="bi bi-graph-up text-success"></i> Usage tracking</li>
+                </ul>
+                <small class="text-muted">
+                    API keys use industry-standard security practices and are never stored in plain text.
+                </small>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-cpu"></i> AI Agent Integration</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">Perfect for:</p>
+                <ul class="small">
+                    <li>Claude with MCP</li>
+                    <li>Custom AI applications</li>
+                    <li>Automated health monitoring</li>
+                    <li>Integration platforms</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyToClipboard(element) {
+    element.select();
+    element.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(element.value).then(function() {
+        // Show brief success feedback
+        const btn = element.nextElementSibling;
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check"></i>';
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+        }, 2000);
+    });
+}
+</script>
+{% endblock %} 

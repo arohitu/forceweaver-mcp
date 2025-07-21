@@ -17,12 +17,27 @@ import secrets
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
+def get_or_create_customer():
+    """Get or create customer record for current user"""
+    customer = current_user.customer
+    
+    if not customer:
+        customer = Customer(
+            email=current_user.email,
+            user_id=current_user.id
+        )
+        db.session.add(customer)
+        db.session.commit()
+        db.session.refresh(customer)
+    
+    return customer
+
 @dashboard_bp.route('/')
 @login_required
 def index():
     """Main dashboard page"""
-    # Get user's customer and connections
-    customer = current_user.customer
+    # Get or create user's customer record
+    customer = get_or_create_customer()
     
     # Dashboard statistics
     stats = {
@@ -59,7 +74,9 @@ def index():
 @login_required
 def salesforce():
     """Salesforce connection management page"""
-    customer = current_user.customer
+    # Get or create user's customer record
+    customer = get_or_create_customer()
+    
     connection = customer.salesforce_connection if customer else None
     
     form = ConnectSalesforceForm()
@@ -91,7 +108,7 @@ def connect_salesforce():
 @login_required
 def disconnect_salesforce():
     """Disconnect Salesforce org"""
-    customer = current_user.customer
+    customer = get_or_create_customer()
     
     if customer and customer.salesforce_connection:
         # Remove the connection
@@ -112,7 +129,7 @@ def disconnect_salesforce():
 @login_required
 def api_keys():
     """API key management page"""
-    customer = current_user.customer
+    customer = get_or_create_customer()
     form = APIKeyForm()
     
     return render_template('dashboard/api_keys.html', 
@@ -124,12 +141,11 @@ def api_keys():
 def create_api_key():
     """Create new API key"""
     form = APIKeyForm()
+    customer = get_or_create_customer()
     
-    if not current_user.customer or not current_user.customer.salesforce_connection:
+    if not customer.salesforce_connection:
         flash('Please connect a Salesforce organization first', 'error')
         return redirect(url_for('dashboard.salesforce'))
-    
-    customer = current_user.customer
     
     # Check if API key already exists
     if customer.api_key:
@@ -181,7 +197,7 @@ def show_api_key():
 @login_required
 def revoke_api_key():
     """Revoke existing API key"""
-    customer = current_user.customer
+    customer = get_or_create_customer()
     
     if customer and customer.api_key:
         db.session.delete(customer.api_key)
@@ -196,7 +212,7 @@ def revoke_api_key():
 @login_required
 def health_checks():
     """Health check history page"""
-    customer = current_user.customer
+    customer = get_or_create_customer()
     
     # Get health check history
     page = request.args.get('page', 1, type=int)
@@ -222,9 +238,9 @@ def health_checks():
 @login_required
 def run_health_check():
     """Run a new health check"""
-    customer = current_user.customer
+    customer = get_or_create_customer()
     
-    if not customer or not customer.salesforce_connection:
+    if not customer.salesforce_connection:
         flash('Please connect a Salesforce organization first', 'error')
         return redirect(url_for('dashboard.salesforce'))
     
@@ -297,7 +313,7 @@ def settings():
 @login_required
 def api_dashboard_stats():
     """API endpoint for dashboard statistics (AJAX)"""
-    customer = current_user.customer
+    customer = get_or_create_customer()
     
     stats = {
         'has_connection': bool(customer and customer.salesforce_connection),
