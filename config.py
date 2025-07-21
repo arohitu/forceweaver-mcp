@@ -41,8 +41,12 @@ class Config:
     # Dynamic Salesforce OAuth Configuration
     @classmethod
     def get_salesforce_redirect_uri(cls):
-        base_domain = cls.get_api_domain()
-        return f'https://{base_domain}/api/auth/salesforce/callback'
+        if cls.IS_STAGING:
+            # Use Heroku app URL for staging (matches your connected app config)
+            return 'https://forceweaver-mcp-staging.herokuapp.com/api/auth/salesforce/callback'
+        else:
+            # Use custom domain for production
+            return 'https://api.forceweaver.com/api/auth/salesforce/callback'
     
     # Static OAuth Configuration (fallback)
     SALESFORCE_CLIENT_ID = os.environ.get('SALESFORCE_CLIENT_ID')
@@ -56,8 +60,12 @@ class Config:
     # Dynamic Google OAuth redirect URI
     @classmethod
     def get_google_redirect_uri(cls):
-        base_domain = cls.get_dashboard_domain()
-        return f'https://{base_domain}/auth/google/callback'
+        if cls.IS_STAGING:
+            # Use Heroku app URL for staging
+            return 'https://forceweaver-mcp-staging.herokuapp.com/auth/google/callback'
+        else:
+            # Use custom domain for production
+            return 'https://healthcheck.forceweaver.com/auth/google/callback'
     
     # Encryption
     ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
