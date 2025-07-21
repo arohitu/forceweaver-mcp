@@ -17,6 +17,39 @@
     {% endif %}
 </div>
 
+<!-- Show newly created API key (one time only) -->
+{% if new_api_key %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-success border-0 shadow-sm">
+            <div class="d-flex align-items-center mb-3">
+                <i class="bi bi-key-fill text-success me-2" style="font-size: 1.2rem;"></i>
+                <strong>Your New API Key: {{ new_api_key_name or 'API Key' }}</strong>
+            </div>
+            
+            <div class="alert alert-warning alert-dismissible mb-3">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <strong>Important:</strong> This is the only time your API key will be displayed. Please copy and store it securely now.
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            
+            <div class="input-group">
+                <input type="text" id="newApiKey" class="form-control font-monospace" value="{{ new_api_key }}" readonly>
+                <button class="btn btn-outline-secondary" type="button" id="copyApiKeyBtn" onclick="copyApiKey()">
+                    <i class="bi bi-clipboard" id="copyIcon"></i>
+                    <span id="copyText">Copy</span>
+                </button>
+            </div>
+            
+            <small class="text-muted d-block mt-2">
+                <i class="bi bi-info-circle"></i> 
+                Use this key in the <code>X-API-Key</code> header for all API requests.
+            </small>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% if not customer or not customer.salesforce_connection %}
 <div class="alert alert-warning">
     <i class="bi bi-exclamation-triangle"></i>
@@ -224,6 +257,39 @@
 
 {% block extra_js %}
 <script>
+// Copy new API key functionality
+function copyApiKey() {
+    const apiKeyInput = document.getElementById('newApiKey');
+    const copyBtn = document.getElementById('copyApiKeyBtn');
+    const copyIcon = document.getElementById('copyIcon');
+    const copyText = document.getElementById('copyText');
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(apiKeyInput.value).then(function() {
+        // Update button appearance
+        copyIcon.className = 'bi bi-check-circle-fill text-success';
+        copyText.textContent = 'Copied!';
+        copyBtn.classList.remove('btn-outline-secondary');
+        copyBtn.classList.add('btn-success');
+        
+        // Reset after 3 seconds
+        setTimeout(() => {
+            copyIcon.className = 'bi bi-clipboard';
+            copyText.textContent = 'Copy';
+            copyBtn.classList.remove('btn-success');
+            copyBtn.classList.add('btn-outline-secondary');
+        }, 3000);
+    }).catch(function() {
+        // Fallback for older browsers
+        apiKeyInput.select();
+        document.execCommand('copy');
+        copyText.textContent = 'Copied!';
+        setTimeout(() => {
+            copyText.textContent = 'Copy';
+        }, 2000);
+    });
+}
+
 function copyToClipboard(element) {
     element.select();
     element.setSelectionRange(0, 99999);

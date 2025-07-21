@@ -216,9 +216,16 @@ def api_keys():
     customer = get_or_create_customer()
     form = APIKeyForm()
     
+    # Check for newly created API key in session (show once)
+    from flask import session
+    new_api_key = session.pop('new_api_key', None)
+    new_api_key_name = session.pop('new_api_key_name', None)
+    
     return render_template('dashboard/api_keys.html', 
                          customer=customer,
-                         form=form)
+                         form=form,
+                         new_api_key=new_api_key,
+                         new_api_key_name=new_api_key_name)
 
 @dashboard_bp.route('/create-api-key', methods=['POST'])
 @login_required
@@ -254,8 +261,8 @@ def create_api_key():
         session['new_api_key'] = api_key_value
         session['new_api_key_name'] = form.key_name.data
         
-        flash('API key created successfully!', 'success')
-        return redirect(url_for('dashboard.show_api_key'))
+        flash('API key created successfully! Please copy and store it securely - it will only be shown once.', 'success')
+        return redirect(url_for('dashboard.api_keys'))
     
     flash('Please provide a valid API key name', 'error')
     return redirect(url_for('dashboard.api_keys'))
@@ -263,19 +270,9 @@ def create_api_key():
 @dashboard_bp.route('/show-api-key')
 @login_required
 def show_api_key():
-    """Show newly created API key (one time only)"""
-    from flask import session
-    
-    api_key = session.pop('new_api_key', None)
-    api_key_name = session.pop('new_api_key_name', None)
-    
-    if not api_key:
-        flash('No new API key to display', 'error')
-        return redirect(url_for('dashboard.api_keys'))
-    
-    return render_template('dashboard/show_api_key.html', 
-                         api_key=api_key,
-                         api_key_name=api_key_name)
+    """Legacy route - redirect to API keys page"""
+    flash('API key display has been moved to the main API keys page', 'info')
+    return redirect(url_for('dashboard.api_keys'))
 
 @dashboard_bp.route('/revoke-api-key', methods=['POST'])
 @login_required
