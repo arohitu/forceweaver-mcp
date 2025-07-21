@@ -164,26 +164,52 @@ def salesforce_callback():
         current_app.logger.info(f"Token validation - Access token: {access_token is not None}, Refresh token: {refresh_token is not None}, Instance URL: {instance_url}")
         current_app.logger.info(f"Identity URL from Salesforce: {identity_url}")
         
-        if not all([access_token, refresh_token, instance_url, identity_url]):
+        # Check required fields (identity_url only needed for production)
+        required_fields = [access_token, refresh_token, instance_url]
+        if 'sandbox' not in instance_url.lower():
+            required_fields.append(identity_url)
+            
+        if not all(required_fields):
             current_app.logger.error("Invalid token response - missing required tokens, instance URL, or identity URL")
             return jsonify({"error": "Invalid token response from Salesforce"}), 400
         
-        # 4. Get user info to identify the org using Salesforce-provided identity URL
-        current_app.logger.info(f"Getting user info from Salesforce identity URL: {identity_url}")
+        # 4. Get organization information - handle sandbox vs production differently
+        is_sandbox = 'sandbox' in instance_url.lower()
+        current_app.logger.info(f"Salesforce environment detected - Sandbox: {is_sandbox}")
         
-        try:
-            user_info = get_salesforce_user_info(access_token, identity_url)
-            current_app.logger.info(f"User info retrieved - Keys: {list(user_info.keys())}")
-            current_app.logger.info(f"Organization details: Name={user_info.get('organization_name')}, ID={user_info.get('organization_id')}, Type={user_info.get('organization_type')}")
-        except Exception as e:
-            current_app.logger.error(f"Failed to retrieve user info: {str(e)}")
-            raise
-            
-        salesforce_org_id = user_info.get('organization_id')
-        
-        if not salesforce_org_id:
-            current_app.logger.error("Unable to retrieve organization ID from Salesforce user info")
-            return jsonify({"error": "Unable to retrieve organization ID"}), 400
+        if is_sandbox:
+            # For sandbox environments, extract org info from instance URL and other sources
+            # Sandbox URLs are like: https://domain--orgname.sandbox.my.salesforce.com
+            import re
+            org_match = re.search(r'https://([^.]+)\.sandbox\.my\.salesforce\.com', instance_url)
+            if org_match:
+                org_identifier = org_match.group(1)
+                # Use the org identifier as a pseudo organization ID for sandbox
+                salesforce_org_id = f"sandbox_{org_identifier}"
+                org_name = session.get('org_nickname', org_identifier.split('--')[-1] if '--' in org_identifier else org_identifier)
+                org_type = 'Sandbox'
+                current_app.logger.info(f"Sandbox org extracted - ID: {salesforce_org_id}, Name: {org_name}, Type: {org_type}")
+            else:
+                current_app.logger.error(f"Could not extract org info from sandbox URL: {instance_url}")
+                return jsonify({"error": "Unable to extract organization information from sandbox"}), 400
+        else:
+            # For production environments, use the identity URL to get user info
+            current_app.logger.info(f"Getting user info from Salesforce identity URL: {identity_url}")
+            try:
+                user_info = get_salesforce_user_info(access_token, identity_url)
+                current_app.logger.info(f"User info retrieved - Keys: {list(user_info.keys())}")
+                current_app.logger.info(f"Organization details: Name={user_info.get('organization_name')}, ID={user_info.get('organization_id')}, Type={user_info.get('organization_type')}")
+                
+                salesforce_org_id = user_info.get('organization_id')
+                org_name = user_info.get('organization_name', session.get('org_nickname', 'My Salesforce Org'))
+                org_type = user_info.get('organization_type', 'Production')
+                
+                if not salesforce_org_id:
+                    current_app.logger.error("Unable to retrieve organization ID from Salesforce user info")
+                    return jsonify({"error": "Unable to retrieve organization ID"}), 400
+            except Exception as e:
+                current_app.logger.error(f"Failed to retrieve user info: {str(e)}")
+                raise
         
         # 5. Determine if this is a web dashboard or API integration
         web_user_id = session.get('user_id_for_oauth')
@@ -255,9 +281,9 @@ def salesforce_callback():
             connection.salesforce_org_id = salesforce_org_id
             connection.encrypted_refresh_token = encrypted_refresh_token
             connection.instance_url = instance_url
-            connection.org_name = user_info.get('organization_name', org_nickname)
-            connection.org_type = user_info.get('organization_type', 'Unknown')
-            connection.is_sandbox = 'sandbox' in instance_url.lower()
+            connection.org_name = org_name
+            connection.org_type = org_type
+            connection.is_sandbox = is_sandbox
         else:
             # Create new connection
             connection = SalesforceConnection(
@@ -265,9 +291,9 @@ def salesforce_callback():
                 encrypted_refresh_token=encrypted_refresh_token,
                 instance_url=instance_url,
                 customer_id=customer.id,
-                org_name=user_info.get('organization_name', org_nickname),
-                org_type=user_info.get('organization_type', 'Unknown'),
-                is_sandbox='sandbox' in instance_url.lower()
+                org_name=org_name,
+                org_type=org_type,
+                is_sandbox=is_sandbox
             )
             db.session.add(connection)
         
