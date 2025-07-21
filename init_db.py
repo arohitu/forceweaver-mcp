@@ -35,29 +35,120 @@ def init_database():
                 for col in columns:
                     print(f"  - {col['name']}: {col['type']}")
             
-            # Check if user_id column exists in customer table
+            # Check and fix customer table schema
             if 'customer' in tables:
                 columns = inspector.get_columns('customer')
                 column_names = [col['name'] for col in columns]
-                if 'user_id' not in column_names:
-                    print("\n⚠️  WARNING: customer table missing user_id column!")
-                    print("   This needs to be added via database migration.")
+                
+                # Define expected columns for Customer model
+                expected_columns = {
+                    'user_id': 'INTEGER',
+                    'created_at': 'TIMESTAMP'
+                }
+                
+                missing_columns = []
+                for col_name, col_type in expected_columns.items():
+                    if col_name not in column_names:
+                        missing_columns.append((col_name, col_type))
+                
+                if missing_columns:
+                    print(f"\n⚠️  WARNING: customer table missing {len(missing_columns)} column(s)!")
+                    for col_name, col_type in missing_columns:
+                        print(f"   - {col_name} ({col_type})")
                     
-                    # Try to add the column
-                    try:
-                        print("   Attempting to add user_id column...")
-                        from sqlalchemy import text
-                        with db.engine.connect() as conn:
-                            conn.execute(text('ALTER TABLE customer ADD COLUMN user_id INTEGER;'))
-                            conn.commit()
-                        print("   ✅ user_id column added successfully!")
-                    except Exception as e:
-                        print(f"   ❌ Failed to add user_id column: {e}")
-                        print("   Will attempt alternative migration method...")
+                    # Add missing columns one by one
+                    from sqlalchemy import text
+                    for col_name, col_type in missing_columns:
+                        try:
+                            print(f"   Attempting to add {col_name} column...")
+                            with db.engine.connect() as conn:
+                                if col_name == 'created_at':
+                                    # Add timestamp column with default value
+                                    conn.execute(text(f'ALTER TABLE customer ADD COLUMN {col_name} TIMESTAMP DEFAULT NOW();'))
+                                else:
+                                    # Add regular column
+                                    conn.execute(text(f'ALTER TABLE customer ADD COLUMN {col_name} {col_type};'))
+                                conn.commit()
+                            print(f"   ✅ {col_name} column added successfully!")
+                        except Exception as e:
+                            print(f"   ❌ Failed to add {col_name} column: {e}")
                 else:
-                    print("\n✅ customer table has user_id column")
+                    print("\n✅ customer table has all required columns")
             
-            print("\nDatabase initialization complete!")
+            # Check and fix api_key table schema  
+            if 'api_key' in tables:
+                columns = inspector.get_columns('api_key')
+                column_names = [col['name'] for col in columns]
+                
+                expected_columns = {
+                    'last_used': 'TIMESTAMP',
+                    'is_active': 'BOOLEAN',
+                    'name': 'VARCHAR(100)'
+                }
+                
+                missing_columns = []
+                for col_name, col_type in expected_columns.items():
+                    if col_name not in column_names:
+                        missing_columns.append((col_name, col_type))
+                
+                if missing_columns:
+                    print(f"\n⚠️  WARNING: api_key table missing {len(missing_columns)} column(s)!")
+                    from sqlalchemy import text
+                    for col_name, col_type in missing_columns:
+                        try:
+                            print(f"   Adding {col_name} column...")
+                            with db.engine.connect() as conn:
+                                if col_name == 'is_active':
+                                    conn.execute(text(f'ALTER TABLE api_key ADD COLUMN {col_name} BOOLEAN DEFAULT TRUE;'))
+                                elif col_name == 'name':
+                                    conn.execute(text(f'ALTER TABLE api_key ADD COLUMN {col_name} VARCHAR(100) DEFAULT \'Default API Key\';'))
+                                else:
+                                    conn.execute(text(f'ALTER TABLE api_key ADD COLUMN {col_name} {col_type};'))
+                                conn.commit()
+                            print(f"   ✅ {col_name} column added!")
+                        except Exception as e:
+                            print(f"   ❌ Failed to add {col_name}: {e}")
+                else:
+                    print("\n✅ api_key table schema is complete")
+            
+            # Check and fix salesforce_connection table schema
+            if 'salesforce_connection' in tables:
+                columns = inspector.get_columns('salesforce_connection')
+                column_names = [col['name'] for col in columns]
+                
+                expected_columns = {
+                    'updated_at': 'TIMESTAMP',
+                    'org_name': 'VARCHAR(255)',
+                    'org_type': 'VARCHAR(50)',
+                    'is_sandbox': 'BOOLEAN'
+                }
+                
+                missing_columns = []
+                for col_name, col_type in expected_columns.items():
+                    if col_name not in column_names:
+                        missing_columns.append((col_name, col_type))
+                
+                if missing_columns:
+                    print(f"\n⚠️  WARNING: salesforce_connection table missing {len(missing_columns)} column(s)!")
+                    from sqlalchemy import text
+                    for col_name, col_type in missing_columns:
+                        try:
+                            print(f"   Adding {col_name} column...")
+                            with db.engine.connect() as conn:
+                                if col_name == 'updated_at':
+                                    conn.execute(text(f'ALTER TABLE salesforce_connection ADD COLUMN {col_name} TIMESTAMP DEFAULT NOW();'))
+                                elif col_name == 'is_sandbox':
+                                    conn.execute(text(f'ALTER TABLE salesforce_connection ADD COLUMN {col_name} BOOLEAN DEFAULT FALSE;'))
+                                else:
+                                    conn.execute(text(f'ALTER TABLE salesforce_connection ADD COLUMN {col_name} {col_type};'))
+                                conn.commit()
+                            print(f"   ✅ {col_name} column added!")
+                        except Exception as e:
+                            print(f"   ❌ Failed to add {col_name}: {e}")
+                else:
+                    print("\n✅ salesforce_connection table schema is complete")
+            
+            print("\nDatabase schema migration complete!")
             
         except Exception as e:
             print(f"Error during database initialization: {e}")
