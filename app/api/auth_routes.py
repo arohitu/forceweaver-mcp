@@ -22,10 +22,18 @@ def initiate_salesforce_auth():
         current_app.logger.info(f"Request headers: Host={request.headers.get('Host')}, User-Agent={request.headers.get('User-Agent')}")
         current_app.logger.info(f"Session before: {dict(session)}")
         
-        # Generate a state parameter for security
+        # Check if there's already an active OAuth flow to prevent conflicts
+        existing_state = session.get('oauth_state')
+        if existing_state:
+            current_app.logger.info(f"Found existing OAuth state, clearing old session data: {existing_state}")
+            # Clear any existing OAuth session data to start fresh
+            for key in ['oauth_state', 'code_verifier', 'token_url', 'customer_email', 'user_id_for_oauth', 'org_nickname', 'environment']:
+                session.pop(key, None)
+        
+        # Generate a fresh state parameter for security
         state = secrets.token_urlsafe(32)
         session['oauth_state'] = state
-        current_app.logger.info(f"Generated OAuth state: {state}")
+        current_app.logger.info(f"Generated new OAuth state: {state}")
 
         # Generate PKCE code verifier and challenge
         code_verifier = secrets.token_urlsafe(64)
@@ -111,7 +119,14 @@ def salesforce_callback():
         if not returned_state or returned_state != stored_state or not code_verifier or not token_url:
             error_msg = f"OAuth validation failed - State match: {returned_state == stored_state}, Code verifier: {code_verifier is not None}, Token URL: {token_url is not None}"
             current_app.logger.error(error_msg)
-            return jsonify({"error": "Invalid state, missing code verifier, or missing token URL"}), 400
+            current_app.logger.error(f"Expected state: {stored_state}")
+            current_app.logger.error(f"Received state: {returned_state}")
+            
+            # If it's a state mismatch (common with multiple OAuth attempts), provide helpful error
+            if returned_state and stored_state and returned_state != stored_state:
+                return jsonify({"error": "OAuth state mismatch - please try connecting again (avoid multiple clicks)"}), 400
+            else:
+                return jsonify({"error": "Invalid state, missing code verifier, or missing token URL"}), 400
         
         # 2. Get the authorization code
         code = request.args.get('code')
