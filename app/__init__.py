@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -15,7 +16,10 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
     
     # Configure session cookies for cross-subdomain support
-    app.config['SESSION_COOKIE_DOMAIN'] = config_class.get_session_cookie_domain()
+    # Use environment variable if set, otherwise use config method
+    session_cookie_domain = os.environ.get('SESSION_COOKIE_DOMAIN', config_class.get_session_cookie_domain())
+    app.config['SESSION_COOKIE_DOMAIN'] = session_cookie_domain
+    app.logger.info(f"Setting SESSION_COOKIE_DOMAIN to: {session_cookie_domain}")
     
     # Initialize extensions
     db.init_app(app)
