@@ -41,11 +41,17 @@ class Config:
     # Dynamic Salesforce OAuth Configuration
     @classmethod
     def get_salesforce_redirect_uri(cls):
+        # First try to get from environment variable (set dynamically)
+        env_redirect_uri = os.environ.get('SALESFORCE_REDIRECT_URI')
+        if env_redirect_uri:
+            return env_redirect_uri
+        
+        # Fallback to default URLs if environment variable is not set
         if cls.IS_STAGING:
-            # Use Heroku app URL for staging (matches your connected app config)
-            return 'https://forceweaver-mcp-staging.herokuapp.com/api/auth/salesforce/callback'
+            # Use Heroku app URL for staging (fallback)
+            return 'https://forceweaver-mcp-staging-6b04df6045f5.herokuapp.com/api/auth/salesforce/callback'
         else:
-            # Use custom domain for production
+            # Use custom domain for production (fallback)
             return 'https://api.forceweaver.com/api/auth/salesforce/callback'
     
     # Static OAuth Configuration (fallback)
