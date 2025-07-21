@@ -86,7 +86,9 @@ def create_app(config_class=Config):
         # API domains (production and staging)  
         api_domains = [
             'api.forceweaver.com',
-            'staging-api.forceweaver.com'
+            'staging-api.forceweaver.com',
+            'forceweaver-mcp-api.herokuapp.com',  # Production Heroku app
+            'forceweaver-mcp-staging.herokuapp.com'  # Staging Heroku app
         ]
         
         is_dashboard_domain = any(domain in host for domain in dashboard_domains)
