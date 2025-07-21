@@ -102,6 +102,14 @@ def create_app(config_class=Config):
         is_api_domain = any(domain in host for domain in api_domains)
         is_localhost = 'localhost' in host or '127.0.0.1' in host
         
+        # DEBUG: Detailed domain matching
+        app.logger.info(f"Domain routing DEBUG - Host: '{host}'")
+        app.logger.info(f"Dashboard domains: {dashboard_domains}")
+        app.logger.info(f"API domains: {api_domains}")
+        for domain in api_domains:
+            match = domain in host
+            app.logger.info(f"  '{domain}' in '{host}' = {match}")
+        
         app.logger.info(f"Domain routing - Dashboard: {is_dashboard_domain}, API: {is_api_domain}, Localhost: {is_localhost}")
         
         # Route based on domain or path for localhost
