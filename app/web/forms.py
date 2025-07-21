@@ -4,7 +4,7 @@ Login, registration, and other web forms
 """
 
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField, SelectField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 from app.models import User
 
@@ -42,6 +42,10 @@ class ConnectSalesforceForm(FlaskForm):
         DataRequired(),
         Length(min=2, max=100, message='Nickname must be between 2 and 100 characters')
     ])
+    environment = SelectField('Environment', choices=[
+        ('production', 'Production'),
+        ('sandbox', 'Sandbox/Developer')
+    ], validators=[DataRequired()])
     submit = SubmitField('Connect Salesforce Org')
 
 class APIKeyForm(FlaskForm):

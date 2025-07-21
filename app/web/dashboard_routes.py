@@ -173,15 +173,19 @@ def connect_salesforce():
     form = ConnectSalesforceForm()
     
     if form.validate_on_submit():
-        # Store org nickname in session for use after OAuth
+        # Store org nickname and environment in session for use after OAuth
         from flask import session
         session['org_nickname'] = form.org_nickname.data
+        session['environment'] = form.environment.data
         session['user_id_for_oauth'] = current_user.id
         
         # Redirect to Salesforce OAuth initiation (reuse existing API route)
-        return redirect(url_for('auth.initiate_salesforce_auth', email=current_user.email))
+        # Add environment parameter to determine which Salesforce instance to use
+        return redirect(url_for('auth.initiate_salesforce_auth', 
+                              email=current_user.email, 
+                              environment=form.environment.data))
     
-    flash('Please provide a valid organization nickname', 'error')
+    flash('Please provide valid organization details', 'error')
     return redirect(url_for('dashboard.salesforce'))
 
 @dashboard_bp.route('/disconnect-salesforce', methods=['POST'])
