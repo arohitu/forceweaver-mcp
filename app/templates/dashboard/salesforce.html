@@ -48,7 +48,7 @@
             </div>
             <div class="card-footer">
                 <form action="{{ url_for('dashboard.disconnect_salesforce') }}" method="POST" class="d-inline">
-                    {{ csrf_token() }}
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-danger" 
                             onclick="return confirm('Are you sure you want to disconnect from Salesforce? This will disable your API access.')">
                         <i class="bi bi-x-circle"></i> Disconnect
@@ -75,7 +75,7 @@
                         <i class="bi bi-key"></i> Manage API Keys
                     </a>
                     <form action="{{ url_for('dashboard.run_health_check') }}" method="POST">
-                        {{ csrf_token() }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-success btn-sm w-100">
                             <i class="bi bi-play-circle"></i> Run Health Check
                         </button>

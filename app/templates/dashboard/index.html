@@ -8,7 +8,7 @@
     <div class="btn-toolbar mb-2 mb-md-0">
         {% if customer and customer.salesforce_connection %}
         <form action="{{ url_for('dashboard.run_health_check') }}" method="POST" class="d-inline">
-            {{ csrf_token() }}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <button type="submit" class="btn btn-primary btn-sm">
                 <i class="bi bi-play-circle"></i> Run Health Check
             </button>
@@ -167,7 +167,7 @@
                         </div>
                         {% if stats.has_salesforce_connection and stats.has_api_key %}
                         <form action="{{ url_for('dashboard.run_health_check') }}" method="POST" class="d-inline">
-                            {{ csrf_token() }}
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <button type="submit" class="btn btn-success btn-sm">
                                 <i class="bi bi-play-circle"></i> Run Health Check
                             </button>
@@ -235,7 +235,7 @@
             <div class="card-body">
                 <div class="d-grid gap-2">
                     <form action="{{ url_for('dashboard.run_health_check') }}" method="POST">
-                        {{ csrf_token() }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <button type="submit" class="btn btn-primary w-100">
                             <i class="bi bi-play-circle"></i> Run Health Check
                         </button>
