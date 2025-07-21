@@ -15,25 +15,39 @@ auth_bp = Blueprint('auth', __name__)
 def initiate_salesforce_auth():
     """Initiate the Salesforce OAuth flow with PKCE, supporting production and sandbox."""
     try:
+        current_app.logger.info("=== SALESFORCE OAUTH INITIATION STARTED ===")
+        current_app.logger.info(f"Request args: {dict(request.args)}")
+        current_app.logger.info(f"Request headers: Host={request.headers.get('Host')}, User-Agent={request.headers.get('User-Agent')}")
+        current_app.logger.info(f"Session before: {dict(session)}")
+        
+        from flask import current_app
+        
         # Generate a state parameter for security
         state = secrets.token_urlsafe(32)
         session['oauth_state'] = state
+        current_app.logger.info(f"Generated OAuth state: {state}")
 
         # Generate PKCE code verifier and challenge
         code_verifier = secrets.token_urlsafe(64)
         session['code_verifier'] = code_verifier
         hashed_verifier = hashlib.sha256(code_verifier.encode('utf-8')).digest()
         code_challenge = base64.urlsafe_b64encode(hashed_verifier).decode('utf-8').replace('=', '')
+        current_app.logger.info(f"Generated PKCE code_verifier length: {len(code_verifier)}")
+        current_app.logger.info(f"Generated PKCE code_challenge: {code_challenge[:20]}...")
         
         # Get customer email from query parameters
         customer_email = request.args.get('email')
         if not customer_email:
+            current_app.logger.error("Missing required email parameter in OAuth initiation")
             return jsonify({"error": "Email parameter is required"}), 400
         
         session['customer_email'] = customer_email
+        current_app.logger.info(f"Customer email stored in session: {customer_email}")
         
         # Determine Salesforce environment
         environment = request.args.get('environment', 'production').lower()
+        current_app.logger.info(f"Salesforce environment requested: {environment}")
+        
         if environment == 'sandbox':
             auth_url = "https://test.salesforce.com/services/oauth2/authorize"
             token_url = "https://test.salesforce.com/services/oauth2/token"
@@ -42,9 +56,13 @@ def initiate_salesforce_auth():
             token_url = "https://login.salesforce.com/services/oauth2/token"
             
         session['token_url'] = token_url
+        current_app.logger.info(f"Auth URL: {auth_url}")
+        current_app.logger.info(f"Token URL: {token_url}")
 
         # Build the Salesforce authorization URL with dynamic redirect URI
         redirect_uri = Config.get_salesforce_redirect_uri()
+        current_app.logger.info(f"Configured redirect URI: {redirect_uri}")
+        
         params = {
             'response_type': 'code',
             'client_id': Config.SALESFORCE_CLIENT_ID,
@@ -55,7 +73,11 @@ def initiate_salesforce_auth():
             'code_challenge_method': 'S256'
         }
         
+        current_app.logger.info(f"OAuth parameters: {dict(params)}")
         auth_url_with_params = f"{auth_url}?{urllib.parse.urlencode(params)}"
+        current_app.logger.info(f"Final OAuth URL: {auth_url_with_params}")
+        current_app.logger.info(f"Session after initiation: {dict(session)}")
+        current_app.logger.info("=== REDIRECTING TO SALESFORCE ===")
         
         return redirect(auth_url_with_params)
     
@@ -75,15 +97,27 @@ def salesforce_callback():
         returned_state = request.args.get('state')
         code_verifier = session.get('code_verifier')
         token_url = session.get('token_url') # Get the token URL from the session
-
-        if not returned_state or returned_state != session.get('oauth_state') or not code_verifier or not token_url:
+        stored_state = session.get('oauth_state')
+        
+        current_app.logger.info(f"State verification - Returned: {returned_state}, Stored: {stored_state}, Match: {returned_state == stored_state}")
+        current_app.logger.info(f"Code verifier present: {code_verifier is not None}")
+        current_app.logger.info(f"Token URL: {token_url}")
+        
+        if not returned_state or returned_state != stored_state or not code_verifier or not token_url:
+            error_msg = f"OAuth validation failed - State match: {returned_state == stored_state}, Code verifier: {code_verifier is not None}, Token URL: {token_url is not None}"
+            current_app.logger.error(error_msg)
             return jsonify({"error": "Invalid state, missing code verifier, or missing token URL"}), 400
         
         # 2. Get the authorization code
         code = request.args.get('code')
+        current_app.logger.info(f"Authorization code received: {code is not None}")
+        if code:
+            current_app.logger.info(f"Authorization code length: {len(code)}")
+        
         if not code:
             error = request.args.get('error')
             error_description = request.args.get('error_description')
+            current_app.logger.error(f"Authorization failed - Error: {error}, Description: {error_description}")
             return jsonify({
                 "error": f"Authorization failed: {error}",
                 "description": error_description
@@ -92,22 +126,43 @@ def salesforce_callback():
         # 3. Exchange the code for tokens using PKCE
         # Use dynamic redirect URI based on environment
         redirect_uri = Config.get_salesforce_redirect_uri()
-        token_response = exchange_code_for_tokens(code, redirect_uri, code_verifier, token_url)
+        current_app.logger.info(f"Exchanging code for tokens - Redirect URI: {redirect_uri}")
+        current_app.logger.info(f"Token exchange URL: {token_url}")
+        
+        try:
+            token_response = exchange_code_for_tokens(code, redirect_uri, code_verifier, token_url)
+            current_app.logger.info(f"Token exchange successful - Response keys: {list(token_response.keys())}")
+        except Exception as e:
+            current_app.logger.error(f"Token exchange failed: {str(e)}")
+            raise
         
         access_token = token_response.get('access_token')
         refresh_token = token_response.get('refresh_token')
         instance_url = token_response.get('instance_url')
         
+        current_app.logger.info(f"Token validation - Access token: {access_token is not None}, Refresh token: {refresh_token is not None}, Instance URL: {instance_url}")
+        
         if not all([access_token, refresh_token, instance_url]):
+            current_app.logger.error("Invalid token response - missing required tokens or instance URL")
             return jsonify({"error": "Invalid token response from Salesforce"}), 400
         
         # 4. Get user info to identify the org
         # The user info endpoint is based on the instance_url returned by Salesforce
         user_info_url = f"{instance_url}/services/oauth2/userinfo"
-        user_info = get_salesforce_user_info(access_token, user_info_url)
+        current_app.logger.info(f"Getting user info from: {user_info_url}")
+        
+        try:
+            user_info = get_salesforce_user_info(access_token, user_info_url)
+            current_app.logger.info(f"User info retrieved - Keys: {list(user_info.keys())}")
+            current_app.logger.info(f"Organization details: Name={user_info.get('organization_name')}, ID={user_info.get('organization_id')}, Type={user_info.get('organization_type')}")
+        except Exception as e:
+            current_app.logger.error(f"Failed to retrieve user info: {str(e)}")
+            raise
+            
         salesforce_org_id = user_info.get('organization_id')
         
         if not salesforce_org_id:
+            current_app.logger.error("Unable to retrieve organization ID from Salesforce user info")
             return jsonify({"error": "Unable to retrieve organization ID"}), 400
         
         # 5. Determine if this is a web dashboard or API integration
@@ -115,31 +170,51 @@ def salesforce_callback():
         customer_email = session.get('customer_email')
         org_nickname = session.get('org_nickname', 'My Salesforce Org')
         
+        current_app.logger.info(f"Integration type determination - Web user ID: {web_user_id}, Customer email: {customer_email}, Org nickname: {org_nickname}")
+        current_app.logger.info(f"Full session contents: {dict(session)}")
+        
         if web_user_id:
             # Web dashboard integration
+            current_app.logger.info(f"Processing web dashboard integration for user ID: {web_user_id}")
             from app.models import User
             user = User.query.get(web_user_id)
             if not user:
+                current_app.logger.error(f"User {web_user_id} not found in database")
                 return jsonify({"error": "User not found"}), 400
             
+            current_app.logger.info(f"User found: {user.email} (ID: {user.id})")
             # Create or get customer for this user
             customer = user.customer
             if not customer:
+                current_app.logger.info(f"Creating new customer for user {user.email}")
                 customer = Customer(email=user.email, user_id=user.id)
                 db.session.add(customer)
                 db.session.flush()
+                current_app.logger.info(f"New customer created with ID: {customer.id}")
+            else:
+                current_app.logger.info(f"Existing customer found: {customer.id}")
         else:
             # API integration
+            current_app.logger.info(f"Processing API integration for email: {customer_email}")
             customer = Customer.query.filter_by(email=customer_email).first()
             if not customer:
+                current_app.logger.info(f"Creating new customer for API integration: {customer_email}")
                 customer = Customer(email=customer_email)
                 db.session.add(customer)
                 db.session.flush()
+                current_app.logger.info(f"New API customer created with ID: {customer.id}")
+            else:
+                current_app.logger.info(f"Existing API customer found: {customer.id}")
         
         # 6. Create or update API key (only if not exists)
         api_key_value = None
-        if not customer.api_key:
+        existing_api_key = customer.api_key
+        current_app.logger.info(f"API key check - Existing API key: {existing_api_key is not None}")
+        
+        if not existing_api_key:
+            current_app.logger.info("Generating new API key for customer")
             api_key_value = generate_api_key()
+            current_app.logger.info("API key generated successfully")
             api_key = APIKey(
                 hashed_key=hash_api_key(api_key_value),
                 customer_id=customer.id,
