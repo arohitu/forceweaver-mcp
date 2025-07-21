@@ -70,6 +70,13 @@ def create_app(config_class=Config):
         app.logger.info(f"Method: {method}")
         app.logger.info(f"User Agent: {request.headers.get('User-Agent', 'Unknown')}")
         
+        # Special logging for callback attempts
+        if 'callback' in path.lower():
+            app.logger.error(f"🔥 CALLBACK REQUEST DETECTED: {method} {path} from {host}")
+            app.logger.error(f"🔥 Full URL would be: https://{host}{path}")
+            app.logger.error(f"🔥 Query string: {request.query_string.decode()}")
+            app.logger.error(f"🔥 All headers: {dict(request.headers)}")
+        
         # Log current user status
         from flask_login import current_user
         if current_user.is_authenticated:
