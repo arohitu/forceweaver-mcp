@@ -19,31 +19,82 @@ web_auth_bp = Blueprint('web_auth', __name__)
 @web_auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """User login page"""
+    current_app.logger.info("=== LOGIN ROUTE ACCESSED ===")
+    current_app.logger.info(f"Request method: {request.method}")
+    current_app.logger.info(f"Current user authenticated: {current_user.is_authenticated}")
+    current_app.logger.info(f"Request path: {request.path}")
+    current_app.logger.info(f"Request args: {dict(request.args)}")
+    
     if current_user.is_authenticated:
+        current_app.logger.info(f"User already authenticated: {current_user.email} (ID: {current_user.id})")
+        current_app.logger.info("Redirecting authenticated user to dashboard")
         return redirect(url_for('dashboard.index'))
     
     form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data.lower().strip()).first()
-        
-        if user and user.check_password(form.password.data):
-            # Update last login
-            from datetime import datetime
-            user.last_login = datetime.utcnow()
-            db.session.commit()
-            
-            login_user(user, remember=form.remember_me.data)
-            
-            # Redirect to next page or dashboard
-            next_page = request.args.get('next')
-            if not next_page or url_parse(next_page).netloc != '':
-                next_page = url_for('dashboard.index')
-            
-            flash('Welcome back!', 'success')
-            return redirect(next_page)
-        else:
-            flash('Invalid email or password', 'error')
+    current_app.logger.info(f"Form created successfully: {type(form)}")
     
+    if form.validate_on_submit():
+        current_app.logger.info("=== LOGIN FORM SUBMITTED ===")
+        email = form.email.data.lower().strip()
+        current_app.logger.info(f"Login attempt for email: {email}")
+        current_app.logger.info(f"Remember me: {form.remember_me.data}")
+        
+        user = User.query.filter_by(email=email).first()
+        current_app.logger.info(f"Database query result - User found: {user is not None}")
+        
+        if user:
+            current_app.logger.info(f"User details: ID={user.id}, Email={user.email}, Active={user.is_active}, First={user.first_name}")
+            password_valid = user.check_password(form.password.data)
+            current_app.logger.info(f"Password validation result: {password_valid}")
+            
+            if password_valid:
+                current_app.logger.info("=== LOGIN SUCCESS - PROCESSING ===")
+                
+                # Update last login
+                from datetime import datetime
+                user.last_login = datetime.utcnow()
+                current_app.logger.info(f"Updating last_login to: {user.last_login}")
+                db.session.commit()
+                current_app.logger.info("Database commit completed for last_login")
+                
+                # Log the user in with Flask-Login
+                current_app.logger.info("Calling Flask-Login login_user()...")
+                login_result = login_user(user, remember=form.remember_me.data)
+                current_app.logger.info(f"Flask-Login login_user result: {login_result}")
+                current_app.logger.info(f"Current user after login_user(): {current_user}")
+                current_app.logger.info(f"Current user authenticated: {current_user.is_authenticated}")
+                current_app.logger.info(f"Current user ID: {current_user.id if current_user.is_authenticated else 'None'}")
+                
+                # Determine redirect destination
+                next_page = request.args.get('next')
+                current_app.logger.info(f"Next page from request: {next_page}")
+                
+                if not next_page or url_parse(next_page).netloc != '':
+                    next_page = url_for('dashboard.index')
+                    current_app.logger.info("Using default dashboard redirect")
+                else:
+                    current_app.logger.info(f"Using custom next page: {next_page}")
+                
+                current_app.logger.info(f"Final redirect URL: {next_page}")
+                
+                flash('Welcome back!', 'success')
+                current_app.logger.info("=== REDIRECTING TO DASHBOARD ===")
+                current_app.logger.info("Login process completed successfully")
+                return redirect(next_page)
+            else:
+                current_app.logger.warning(f"Password validation failed for user: {email}")
+                flash('Invalid email or password', 'error')
+        else:
+            current_app.logger.warning(f"User not found in database: {email}")
+            flash('Invalid email or password', 'error')
+    else:
+        if request.method == 'POST':
+            current_app.logger.warning("Form validation failed on POST")
+            current_app.logger.warning(f"Form errors: {form.errors}")
+        else:
+            current_app.logger.info("GET request - showing login form")
+    
+    current_app.logger.info("Rendering login template")
     return render_template('auth/login.html', form=form)
 
 @web_auth_bp.route('/register', methods=['GET', 'POST'])
