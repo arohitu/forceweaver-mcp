@@ -159,20 +159,20 @@ def salesforce_callback():
         access_token = token_response.get('access_token')
         refresh_token = token_response.get('refresh_token')
         instance_url = token_response.get('instance_url')
+        identity_url = token_response.get('id')  # Salesforce provides the identity URL
         
         current_app.logger.info(f"Token validation - Access token: {access_token is not None}, Refresh token: {refresh_token is not None}, Instance URL: {instance_url}")
+        current_app.logger.info(f"Identity URL from Salesforce: {identity_url}")
         
-        if not all([access_token, refresh_token, instance_url]):
-            current_app.logger.error("Invalid token response - missing required tokens or instance URL")
+        if not all([access_token, refresh_token, instance_url, identity_url]):
+            current_app.logger.error("Invalid token response - missing required tokens, instance URL, or identity URL")
             return jsonify({"error": "Invalid token response from Salesforce"}), 400
         
-        # 4. Get user info to identify the org
-        # The user info endpoint is based on the instance_url returned by Salesforce
-        user_info_url = f"{instance_url}/services/oauth2/userinfo"
-        current_app.logger.info(f"Getting user info from: {user_info_url}")
+        # 4. Get user info to identify the org using Salesforce-provided identity URL
+        current_app.logger.info(f"Getting user info from Salesforce identity URL: {identity_url}")
         
         try:
-            user_info = get_salesforce_user_info(access_token, user_info_url)
+            user_info = get_salesforce_user_info(access_token, identity_url)
             current_app.logger.info(f"User info retrieved - Keys: {list(user_info.keys())}")
             current_app.logger.info(f"Organization details: Name={user_info.get('organization_name')}, ID={user_info.get('organization_id')}, Type={user_info.get('organization_type')}")
         except Exception as e:

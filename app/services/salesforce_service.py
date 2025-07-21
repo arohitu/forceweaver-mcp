@@ -60,15 +60,12 @@ def exchange_code_for_tokens(authorization_code, redirect_uri, code_verifier, to
     
     return response.json()
 
-def get_salesforce_user_info(access_token, instance_url):
-    """Get user information from Salesforce using the access token."""
+def get_salesforce_user_info(access_token, user_info_url):
+    """Get user information from Salesforce using the access token and provided identity URL."""
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json'
     }
-    
-    # Get user ID from the access token response
-    user_info_url = f"{instance_url}/services/oauth2/userinfo"
     
     response = requests.get(user_info_url, headers=headers)
     
