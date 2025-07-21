@@ -1,17 +1,31 @@
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_login import LoginManager
 from config import Config
 
 db = SQLAlchemy()
 migrate = Migrate()
+login_manager = LoginManager()
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    
+    # Initialize Flask-Login
+    login_manager.init_app(app)
+    login_manager.login_view = 'dashboard.login'
+    login_manager.login_message = 'Please log in to access this page.'
+    login_manager.login_message_category = 'info'
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.models import User
+        return User.query.get(int(user_id))
 
     # Setup logging
     from app.core.logging_config import setup_logging
@@ -21,23 +35,84 @@ def create_app(config_class=Config):
     from app.core.errors import register_error_handlers
     register_error_handlers(app)
 
-    # Register blueprints
+    # Register blueprints based on domain
+    @app.before_request
+    def route_by_domain():
+        # Route requests based on domain/subdomain
+        host = request.headers.get('Host', '')
+        
+        # Dashboard domains (production and staging)
+        dashboard_domains = [
+            'healthcheck.forceweaver.com',
+            'staging-healthcheck.forceweaver.com'
+        ]
+        
+        # API domains (production and staging)  
+        api_domains = [
+            'api.forceweaver.com',
+            'staging-api.forceweaver.com'
+        ]
+        
+        is_dashboard_domain = any(domain in host for domain in dashboard_domains)
+        is_api_domain = any(domain in host for domain in api_domains)
+        is_localhost = 'localhost' in host or '127.0.0.1' in host
+        
+        # Route based on domain or path for localhost
+        if is_dashboard_domain or (is_localhost and request.path.startswith('/dashboard')):
+            # Web dashboard routes
+            pass  # Will be handled by dashboard blueprint
+        elif is_api_domain or (is_localhost and request.path.startswith('/api/')):
+            # API routes
+            pass  # Will be handled by API blueprints
+        elif is_localhost:
+            # Allow all routes on localhost for development
+            pass
+    
+    # API Blueprints (for api.forceweaver.com)
     from app.api.auth_routes import auth_bp
     from app.api.mcp_routes import mcp_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(mcp_bp, url_prefix='/api/mcp')
     
-    # Add a simple health check endpoint
-    @app.route('/health')
-    def health_check():
-        return {"status": "healthy", "service": "forceweaver-mcp"}
+    # Web Dashboard Blueprints (for healthcheck.forceweaver.com)
+    from app.web.dashboard_routes import dashboard_bp
+    from app.web.auth_routes import web_auth_bp
     
-    # Add a root endpoint
+    app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
+    app.register_blueprint(web_auth_bp, url_prefix='/auth')
+    
+    # Root endpoints - serve different content based on domain
     @app.route('/')
     def index():
+        host = request.headers.get('Host', '')
+        
+        # Dashboard domains (production and staging)
+        dashboard_domains = [
+            'healthcheck.forceweaver.com',
+            'staging-healthcheck.forceweaver.com'
+        ]
+        
+        is_dashboard_domain = any(domain in host for domain in dashboard_domains)
+        is_localhost = 'localhost' in host or '127.0.0.1' in host
+        
+        if is_dashboard_domain or is_localhost:
+            # Web dashboard home - redirect to login or dashboard
+            from flask import redirect, url_for
+            from flask_login import current_user
+            
+            if current_user.is_authenticated:
+                return redirect(url_for('dashboard.index'))
+            else:
+                return redirect(url_for('web_auth.login'))
+        
+        # API domain - return API info with environment context
+        environment_name = Config.get_environment_name()
+        app_name = Config.get_app_name()
+        
         return {
-            "service": "ForceWeaver MCP API",
+            "service": app_name,
+            "environment": environment_name,
             "version": "1.0.0",
             "description": "Monetized Revenue Cloud Health Checker API for AI agents",
             "endpoints": {
@@ -52,6 +127,11 @@ def create_app(config_class=Config):
                 "mcp_compliance": "This API follows MCP (Model Context Protocol) standards"
             }
         }
+    
+    # Health check endpoint
+    @app.route('/health')
+    def health_check():
+        return {"status": "healthy", "service": "forceweaver-mcp"}
     
     app.logger.info("ForceWeaver MCP API initialized successfully")
     return app

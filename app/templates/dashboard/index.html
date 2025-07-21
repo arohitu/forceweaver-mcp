@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - ForceWeaver{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        {% if customer and customer.salesforce_connection %}
+        <form action="{{ url_for('dashboard.run_health_check') }}" method="POST" class="d-inline">
+            {{ csrf_token() }}
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-play-circle"></i> Run Health Check
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Welcome Message -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            <strong>Welcome to ForceWeaver!</strong> 
+            Monitor your Salesforce Revenue Cloud health with AI-powered insights.
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-cloud-check {% if stats.has_salesforce_connection %}text-success{% else %}text-muted{% endif %} fs-1"></i>
+                <h5 class="card-title">Salesforce Org</h5>
+                <p class="card-text">
+                    {% if stats.has_salesforce_connection %}
+                        <span class="text-success">Connected</span>
+                    {% else %}
+                        <span class="text-muted">Not Connected</span>
+                    {% endif %}
+                </p>
+                {% if not stats.has_salesforce_connection %}
+                <a href="{{ url_for('dashboard.salesforce') }}" class="btn btn-primary btn-sm">Connect</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-key {% if stats.has_api_key %}text-success{% else %}text-muted{% endif %} fs-1"></i>
+                <h5 class="card-title">API Key</h5>
+                <p class="card-text">
+                    {% if stats.has_api_key %}
+                        <span class="text-success">Active</span>
+                    {% else %}
+                        <span class="text-muted">Not Created</span>
+                    {% endif %}
+                </p>
+                {% if not stats.has_api_key and stats.has_salesforce_connection %}
+                <a href="{{ url_for('dashboard.api_keys') }}" class="btn btn-primary btn-sm">Create</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-activity text-primary fs-1"></i>
+                <h5 class="card-title">Health Checks</h5>
+                <p class="card-text">
+                    <strong>{{ stats.total_health_checks }}</strong> performed
+                </p>
+                {% if stats.has_salesforce_connection %}
+                <a href="{{ url_for('dashboard.health_checks') }}" class="btn btn-outline-primary btn-sm">View History</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-clock text-info fs-1"></i>
+                <h5 class="card-title">Last Check</h5>
+                <p class="card-text">
+                    {% if stats.last_health_check %}
+                        {{ moment(stats.last_health_check).fromNow() }}
+                    {% else %}
+                        <span class="text-muted">Never</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Setup Steps -->
+{% if not stats.has_salesforce_connection or not stats.has_api_key %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Setup Steps</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center mb-3">
+                            {% if stats.has_salesforce_connection %}
+                                <i class="bi bi-check-circle-fill text-success me-3 fs-4"></i>
+                            {% else %}
+                                <i class="bi bi-circle me-3 fs-4 text-muted"></i>
+                            {% endif %}
+                            <div>
+                                <h6 class="mb-1">1. Connect Salesforce</h6>
+                                <small class="text-muted">Connect your Salesforce org for health monitoring</small>
+                            </div>
+                        </div>
+                        {% if not stats.has_salesforce_connection %}
+                        <a href="{{ url_for('dashboard.salesforce') }}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-cloud-plus"></i> Connect Salesforce
+                        </a>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center mb-3">
+                            {% if stats.has_api_key %}
+                                <i class="bi bi-check-circle-fill text-success me-3 fs-4"></i>
+                            {% else %}
+                                <i class="bi bi-circle me-3 fs-4 text-muted"></i>
+                            {% endif %}
+                            <div>
+                                <h6 class="mb-1">2. Generate API Key</h6>
+                                <small class="text-muted">Create API key for AI agent integration</small>
+                            </div>
+                        </div>
+                        {% if stats.has_salesforce_connection and not stats.has_api_key %}
+                        <a href="{{ url_for('dashboard.api_keys') }}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-key"></i> Create API Key
+                        </a>
+                        {% elif not stats.has_salesforce_connection %}
+                        <button class="btn btn-secondary btn-sm" disabled>
+                            <i class="bi bi-key"></i> Create API Key
+                        </button>
+                        <small class="text-muted d-block">Connect Salesforce first</small>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center mb-3">
+                            {% if stats.total_health_checks > 0 %}
+                                <i class="bi bi-check-circle-fill text-success me-3 fs-4"></i>
+                            {% else %}
+                                <i class="bi bi-circle me-3 fs-4 text-muted"></i>
+                            {% endif %}
+                            <div>
+                                <h6 class="mb-1">3. Run Health Check</h6>
+                                <small class="text-muted">Perform your first health analysis</small>
+                            </div>
+                        </div>
+                        {% if stats.has_salesforce_connection and stats.has_api_key %}
+                        <form action="{{ url_for('dashboard.run_health_check') }}" method="POST" class="d-inline">
+                            {{ csrf_token() }}
+                            <button type="submit" class="btn btn-success btn-sm">
+                                <i class="bi bi-play-circle"></i> Run Health Check
+                            </button>
+                        </form>
+                        {% else %}
+                        <button class="btn btn-secondary btn-sm" disabled>
+                            <i class="bi bi-play-circle"></i> Run Health Check
+                        </button>
+                        <small class="text-muted d-block">Complete previous steps first</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Org Information -->
+{% if customer and customer.salesforce_connection %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-building"></i> Salesforce Organization</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Organization Name:</strong><br>
+                        {{ customer.salesforce_connection.org_name or 'Loading...' }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Organization Type:</strong><br>
+                        {{ customer.salesforce_connection.org_type or 'Unknown' }}
+                        {% if customer.salesforce_connection.is_sandbox %}
+                            <span class="badge bg-warning text-dark">Sandbox</span>
+                        {% else %}
+                            <span class="badge bg-success">Production</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <strong>Instance URL:</strong><br>
+                        <a href="{{ customer.salesforce_connection.instance_url }}" target="_blank" class="text-decoration-none">
+                            {{ customer.salesforce_connection.instance_url }}
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Connected:</strong><br>
+                        {{ moment(customer.salesforce_connection.created_at).fromNow() }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <form action="{{ url_for('dashboard.run_health_check') }}" method="POST">
+                        {{ csrf_token() }}
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-play-circle"></i> Run Health Check
+                        </button>
+                    </form>
+                    <a href="{{ url_for('dashboard.api_keys') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-key"></i> Manage API Keys
+                    </a>
+                    <a href="{{ url_for('dashboard.health_checks') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-clock-history"></i> View History
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- API Usage -->
+{% if customer and customer.api_key %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-terminal"></i> API Integration</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Your API is ready for AI agent integration. Use the following endpoint:</p>
+                <div class="row">
+                    <div class="col-md-8">
+                        <strong>Health Check Endpoint:</strong><br>
+                        <code>POST https://api.forceweaver.com/api/mcp/health-check</code>
+                        <br><br>
+                        <strong>Authorization Header:</strong><br>
+                        <code>Authorization: Bearer YOUR_API_KEY</code>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Last API Usage:</strong><br>
+                        {% if stats.api_key_last_used %}
+                            {{ moment(stats.api_key_last_used).fromNow() }}
+                        {% else %}
+                            <span class="text-muted">Never used</span>
+                        {% endif %}
+                        <br><br>
+                        <a href="{{ url_for('dashboard.api_keys') }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-gear"></i> Manage API Keys
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script>
+// Add moment.js to Jinja2 context for template usage
+window.moment = moment;
+
+// Auto-refresh dashboard stats every 30 seconds
+setInterval(function() {
+    fetch('/dashboard/api/dashboard-stats')
+        .then(response => response.json())
+        .then(data => {
+            // Update stats if needed
+            console.log('Dashboard stats updated:', data);
+        })
+        .catch(error => console.log('Stats update failed:', error));
+}, 30000);
+</script>
+{% endblock %} 

@@ -89,13 +89,18 @@ def require_api_key(f):
                 logger.warning(f"Invalid API key attempt from {request.remote_addr}")
                 abort(401, 'Invalid API key.')
             
-            # Attach the customer to the request context
-            g.customer = api_key.customer
-            g.api_key = api_key
-            
-            logger.info(f"API key authentication successful for customer {api_key.customer.email}")
-            
-            return f(*args, **kwargs)
+                            # Update last used timestamp
+                from datetime import datetime
+                api_key.last_used = datetime.utcnow()
+                db.session.commit()
+                
+                # Attach the customer to the request context
+                g.customer = api_key.customer
+                g.api_key = api_key
+                
+                logger.info(f"API key authentication successful for customer {api_key.customer.email}")
+                
+                return f(*args, **kwargs)
             
         except Exception as e:
             logger.error(f"API key authentication error: {e}")

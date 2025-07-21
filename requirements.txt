@@ -1,6 +1,9 @@
 Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
 Flask-Migrate==4.0.5
+Flask-Login==0.6.2
+Flask-WTF==1.1.1
+WTForms==3.0.1
 python-dotenv==1.0.0
 simple-salesforce==1.12.4
 cryptography==41.0.7
@@ -8,4 +11,8 @@ gunicorn==21.2.0
 requests==2.31.0
 werkzeug==2.3.7
 psycopg2-binary==2.9.7
-pyjwt==2.8.0 
+pyjwt==2.8.0
+google-auth==2.23.4
+google-auth-oauthlib==1.1.0
+google-auth-httplib2==0.1.1
+email-validator==2.0.0 

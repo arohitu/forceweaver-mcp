@@ -43,11 +43,12 @@ def initiate_salesforce_auth():
             
         session['token_url'] = token_url
 
-        # Build the Salesforce authorization URL
+        # Build the Salesforce authorization URL with dynamic redirect URI
+        redirect_uri = Config.get_salesforce_redirect_uri()
         params = {
             'response_type': 'code',
             'client_id': Config.SALESFORCE_CLIENT_ID,
-            'redirect_uri': Config.SALESFORCE_REDIRECT_URI,
+            'redirect_uri': redirect_uri,
             'state': state,
             'scope': 'api refresh_token',
             'code_challenge': code_challenge,
@@ -84,8 +85,9 @@ def salesforce_callback():
             }), 400
         
         # 3. Exchange the code for tokens using PKCE
-        # The token exchange URL is now dynamic based on the initial environment
-        token_response = exchange_code_for_tokens(code, Config.SALESFORCE_REDIRECT_URI, code_verifier, token_url)
+        # Use dynamic redirect URI based on environment
+        redirect_uri = Config.get_salesforce_redirect_uri()
+        token_response = exchange_code_for_tokens(code, redirect_uri, code_verifier, token_url)
         
         access_token = token_response.get('access_token')
         refresh_token = token_response.get('refresh_token')
@@ -103,26 +105,42 @@ def salesforce_callback():
         if not salesforce_org_id:
             return jsonify({"error": "Unable to retrieve organization ID"}), 400
         
-        # 5. Create or get customer
+        # 5. Determine if this is a web dashboard or API integration
+        web_user_id = session.get('user_id_for_oauth')
         customer_email = session.get('customer_email')
-        customer = Customer.query.filter_by(email=customer_email).first()
+        org_nickname = session.get('org_nickname', 'My Salesforce Org')
         
-        if not customer:
-            customer = Customer(email=customer_email)
-            db.session.add(customer)
-            db.session.flush()  # Get the customer ID
+        if web_user_id:
+            # Web dashboard integration
+            from app.models import User
+            user = User.query.get(web_user_id)
+            if not user:
+                return jsonify({"error": "User not found"}), 400
+            
+            # Create or get customer for this user
+            customer = user.customer
+            if not customer:
+                customer = Customer(email=user.email, user_id=user.id)
+                db.session.add(customer)
+                db.session.flush()
+        else:
+            # API integration
+            customer = Customer.query.filter_by(email=customer_email).first()
+            if not customer:
+                customer = Customer(email=customer_email)
+                db.session.add(customer)
+                db.session.flush()
         
-        # 6. Create or update API key
+        # 6. Create or update API key (only if not exists)
+        api_key_value = None
         if not customer.api_key:
             api_key_value = generate_api_key()
             api_key = APIKey(
                 hashed_key=hash_api_key(api_key_value),
-                customer_id=customer.id
+                customer_id=customer.id,
+                name=org_nickname if web_user_id else "API Integration"
             )
             db.session.add(api_key)
-        else:
-            # Customer already has an API key, use existing one
-            api_key_value = "existing_key_hidden"
         
         # 7. Encrypt and save the refresh token
         encrypted_refresh_token = encrypt_token(refresh_token)
@@ -137,13 +155,19 @@ def salesforce_callback():
             connection.salesforce_org_id = salesforce_org_id
             connection.encrypted_refresh_token = encrypted_refresh_token
             connection.instance_url = instance_url
+            connection.org_name = user_info.get('organization_name', org_nickname)
+            connection.org_type = user_info.get('organization_type', 'Unknown')
+            connection.is_sandbox = 'sandbox' in instance_url.lower()
         else:
             # Create new connection
             connection = SalesforceConnection(
                 salesforce_org_id=salesforce_org_id,
                 encrypted_refresh_token=encrypted_refresh_token,
                 instance_url=instance_url,
-                customer_id=customer.id
+                customer_id=customer.id,
+                org_name=user_info.get('organization_name', org_nickname),
+                org_type=user_info.get('organization_type', 'Unknown'),
+                is_sandbox='sandbox' in instance_url.lower()
             )
             db.session.add(connection)
         
@@ -155,23 +179,39 @@ def salesforce_callback():
         session.pop('code_verifier', None)
         session.pop('token_url', None)
         
-        # 10. Return success response with API key (only for new customers)
-        response_data = {
-            "message": "Salesforce connection established successfully",
-            "customer_id": customer.id,
-            "salesforce_org_id": salesforce_org_id,
-            "instance_url": instance_url
-        }
-        
-        if api_key_value != "existing_key_hidden":
-            response_data["api_key"] = api_key_value
-            response_data["note"] = "Please save this API key securely. It will not be shown again."
-        
-        return jsonify(response_data), 200
+        # 10. Return appropriate response
+        if web_user_id:
+            # Web dashboard - redirect to dashboard
+            session.pop('user_id_for_oauth', None)
+            session.pop('org_nickname', None)
+            from flask import flash
+            flash('Salesforce organization connected successfully!', 'success')
+            return redirect(url_for('dashboard.salesforce'))
+        else:
+            # API integration - return JSON
+            response_data = {
+                "message": "Salesforce connection established successfully",
+                "customer_id": customer.id,
+                "salesforce_org_id": salesforce_org_id,
+                "instance_url": instance_url
+            }
+            
+            if api_key_value:
+                response_data["api_key"] = api_key_value
+                response_data["note"] = "Please save this API key securely. It will not be shown again."
+            
+            return jsonify(response_data), 200
     
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": f"OAuth callback failed: {str(e)}"}), 500
+        if session.get('user_id_for_oauth'):
+            # Web dashboard error
+            from flask import flash
+            flash('Failed to connect Salesforce organization. Please try again.', 'error')
+            return redirect(url_for('dashboard.salesforce'))
+        else:
+            # API error
+            return jsonify({"error": f"OAuth callback failed: {str(e)}"}), 500
 
 @auth_bp.route('/customer/status')
 def customer_status():
