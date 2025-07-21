@@ -165,11 +165,11 @@
                     {{ form.hidden_tag() }}
                     
                     <div class="mb-3">
-                        {{ form.name.label(class="form-label") }}
-                        {{ form.name(class="form-control", placeholder="e.g., Production API Key, AI Agent Access, etc.") }}
-                        {% if form.name.errors %}
+                        {{ form.key_name.label(class="form-label") }}
+                        {{ form.key_name(class="form-control", placeholder="e.g., Production API Key, AI Agent Access, etc.") }}
+                        {% if form.key_name.errors %}
                             <div class="text-danger small">
-                                {% for error in form.name.errors %}
+                                {% for error in form.key_name.errors %}
                                     <div>{{ error }}</div>
                                 {% endfor %}
                             </div>
