@@ -81,6 +81,7 @@ def init_database():
                 column_names = [col['name'] for col in columns]
                 
                 expected_columns = {
+                    'created_at': 'TIMESTAMP',
                     'last_used': 'TIMESTAMP',
                     'is_active': 'BOOLEAN',
                     'name': 'VARCHAR(100)'
@@ -98,7 +99,11 @@ def init_database():
                         try:
                             print(f"   Adding {col_name} column...")
                             with db.engine.connect() as conn:
-                                if col_name == 'is_active':
+                                if col_name == 'created_at':
+                                    conn.execute(text(f'ALTER TABLE api_key ADD COLUMN {col_name} TIMESTAMP DEFAULT NOW();'))
+                                elif col_name == 'last_used':
+                                    conn.execute(text(f'ALTER TABLE api_key ADD COLUMN {col_name} TIMESTAMP;'))
+                                elif col_name == 'is_active':
                                     conn.execute(text(f'ALTER TABLE api_key ADD COLUMN {col_name} BOOLEAN DEFAULT TRUE;'))
                                 elif col_name == 'name':
                                     conn.execute(text(f'ALTER TABLE api_key ADD COLUMN {col_name} VARCHAR(100) DEFAULT \'Default API Key\';'))
@@ -117,6 +122,7 @@ def init_database():
                 column_names = [col['name'] for col in columns]
                 
                 expected_columns = {
+                    'created_at': 'TIMESTAMP',
                     'updated_at': 'TIMESTAMP',
                     'org_name': 'VARCHAR(255)',
                     'org_type': 'VARCHAR(50)',
@@ -135,7 +141,7 @@ def init_database():
                         try:
                             print(f"   Adding {col_name} column...")
                             with db.engine.connect() as conn:
-                                if col_name == 'updated_at':
+                                if col_name in ['created_at', 'updated_at']:
                                     conn.execute(text(f'ALTER TABLE salesforce_connection ADD COLUMN {col_name} TIMESTAMP DEFAULT NOW();'))
                                 elif col_name == 'is_sandbox':
                                     conn.execute(text(f'ALTER TABLE salesforce_connection ADD COLUMN {col_name} BOOLEAN DEFAULT FALSE;'))
