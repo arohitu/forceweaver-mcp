@@ -37,6 +37,23 @@ class Config:
         if cls.IS_STAGING:
             return 'staging'
         return 'production'
+
+    # External URL helper methods for redirects
+    @classmethod
+    def get_dashboard_url(cls, path=''):
+        """Get the full dashboard URL with optional path"""
+        dashboard_domain = cls.get_dashboard_domain()
+        if path and not path.startswith('/'):
+            path = '/' + path
+        return f'https://{dashboard_domain}{path}'
+
+    @classmethod
+    def get_api_url(cls, path=''):
+        """Get the full API URL with optional path"""
+        api_domain = cls.get_api_domain()
+        if path and not path.startswith('/'):
+            path = '/' + path
+        return f'https://{api_domain}{path}'
     
     # Dynamic Salesforce OAuth Configuration
     @classmethod
@@ -53,14 +70,9 @@ class Config:
             print(f"DEBUG: Using env var value: {env_redirect_uri}", file=sys.stderr)
             return env_redirect_uri
         
-        # Fallback to default URLs if environment variable is not set
-        fallback_url = None
-        if cls.IS_STAGING:
-            # Use Heroku app URL for staging (fallback)
-            fallback_url = 'https://forceweaver-mcp-staging-6b04df6045f5.herokuapp.com/api/auth/salesforce/callback'
-        else:
-            # Use custom domain for production (fallback)
-            fallback_url = 'https://api.forceweaver.com/api/auth/salesforce/callback'
+        # Use the correct domain-based URLs
+        api_domain = cls.get_api_domain()
+        fallback_url = f'https://{api_domain}/api/auth/salesforce/callback'
         
         print(f"DEBUG: Using fallback value: {fallback_url}", file=sys.stderr)
         return fallback_url
@@ -77,12 +89,8 @@ class Config:
     # Dynamic Google OAuth redirect URI
     @classmethod
     def get_google_redirect_uri(cls):
-        if cls.IS_STAGING:
-            # Use Heroku app URL for staging
-            return 'https://forceweaver-mcp-staging.herokuapp.com/auth/google/callback'
-        else:
-            # Use custom domain for production
-            return 'https://healthcheck.forceweaver.com/auth/google/callback'
+        dashboard_domain = cls.get_dashboard_domain()
+        return f'https://{dashboard_domain}/auth/google/callback'
     
     # Encryption
     ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')

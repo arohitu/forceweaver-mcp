@@ -34,6 +34,9 @@ You need **TWO separate Salesforce Connected Apps** (or configure one with multi
    https://api.forceweaver.com/api/auth/salesforce/callback
    https://staging-api.forceweaver.com/api/auth/salesforce/callback
    ```
+4. **OAuth Settings:**
+   - Selected OAuth Scopes: `api`, `refresh_token`
+   - Enable PKCE: ✅ Recommended for security
 
 #### **Option B: Separate Connected Apps**
 Create two identical connected apps with different callback URLs.
@@ -295,6 +298,24 @@ curl https://staging-api.forceweaver.com/health
 curl "https://staging-api.forceweaver.com/api/auth/salesforce/initiate?email=test@staging.com"
 # Should redirect to Salesforce
 ```
+
+### **OAuth Flow Testing**
+
+#### **Test Staging OAuth Redirect:**
+1. **Go to:** `https://staging-healthcheck.forceweaver.com`
+2. **Register/Login** to dashboard
+3. **Navigate to:** Salesforce Org section
+4. **Click:** "Connect Salesforce Org"
+5. **Complete OAuth** flow in Salesforce
+6. **Expected Result:** Redirected back to `https://staging-healthcheck.forceweaver.com/dashboard/salesforce`
+
+#### **Test Production OAuth Redirect:**
+1. **Go to:** `https://healthcheck.forceweaver.com`
+2. **Register/Login** to dashboard
+3. **Navigate to:** Salesforce Org section
+4. **Click:** "Connect Salesforce Org"
+5. **Complete OAuth** flow in Salesforce
+6. **Expected Result:** Redirected back to `https://healthcheck.forceweaver.com/dashboard/salesforce`
 
 ### **Production Environment Tests**
 

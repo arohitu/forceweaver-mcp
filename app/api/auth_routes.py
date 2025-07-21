@@ -15,12 +15,12 @@ auth_bp = Blueprint('auth', __name__)
 def initiate_salesforce_auth():
     """Initiate the Salesforce OAuth flow with PKCE, supporting production and sandbox."""
     try:
+        from flask import current_app
+        
         current_app.logger.info("=== SALESFORCE OAUTH INITIATION STARTED ===")
         current_app.logger.info(f"Request args: {dict(request.args)}")
         current_app.logger.info(f"Request headers: Host={request.headers.get('Host')}, User-Agent={request.headers.get('User-Agent')}")
         current_app.logger.info(f"Session before: {dict(session)}")
-        
-        from flask import current_app
         
         # Generate a state parameter for security
         state = secrets.token_urlsafe(32)
@@ -88,11 +88,11 @@ def initiate_salesforce_auth():
 def salesforce_callback():
     """Handle the Salesforce OAuth callback."""
     try:
+        from flask import current_app
+        
         current_app.logger.info("=== SALESFORCE CALLBACK STARTED ===")
         current_app.logger.info(f"Request args: {dict(request.args)}")
         current_app.logger.info(f"Session data: user_id_for_oauth={session.get('user_id_for_oauth')}, customer_email={session.get('customer_email')}")
-        
-        from flask import current_app
         # 1. Verify state and get code verifier
         returned_state = request.args.get('state')
         code_verifier = session.get('code_verifier')
@@ -262,14 +262,15 @@ def salesforce_callback():
         # 10. Return appropriate response
         current_app.logger.info(f"=== CALLBACK COMPLETION - web_user_id: {web_user_id} ===")
         if web_user_id:
-            # Web dashboard - redirect to dashboard
+            # Web dashboard - redirect to external dashboard URL
             current_app.logger.info("Processing web dashboard redirect...")
             session.pop('user_id_for_oauth', None)
             session.pop('org_nickname', None)
             from flask import flash
             flash('Salesforce organization connected successfully!', 'success')
-            redirect_url = url_for('dashboard.salesforce')
-            current_app.logger.info(f"Redirecting to: {redirect_url}")
+            # Redirect to the external dashboard URL instead of relative URL
+            redirect_url = Config.get_dashboard_url('/dashboard/salesforce')
+            current_app.logger.info(f"Redirecting to external URL: {redirect_url}")
             return redirect(redirect_url)
         else:
             # API integration - return JSON
@@ -296,7 +297,8 @@ def salesforce_callback():
             current_app.logger.error("Handling as web dashboard error...")
             from flask import flash
             flash('Failed to connect Salesforce organization. Please try again.', 'error')
-            error_redirect = url_for('dashboard.salesforce')
+            # Redirect to external dashboard URL for error case too
+            error_redirect = Config.get_dashboard_url('/dashboard/salesforce')
             current_app.logger.error(f"Error redirect URL: {error_redirect}")
             return redirect(error_redirect)
         else:
