@@ -2,11 +2,13 @@ from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
 from config import Config
 
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
+csrf = CSRFProtect()
 
 def create_app(config_class=Config):
     app = Flask(__name__)
@@ -15,10 +17,11 @@ def create_app(config_class=Config):
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
+    csrf.init_app(app)
     
     # Initialize Flask-Login
     login_manager.init_app(app)
-    login_manager.login_view = 'dashboard.login'
+    login_manager.login_view = 'web_auth.login'
     login_manager.login_message = 'Please log in to access this page.'
     login_manager.login_message_category = 'info'
 
@@ -26,6 +29,12 @@ def create_app(config_class=Config):
     def load_user(user_id):
         from app.models import User
         return User.query.get(int(user_id))
+    
+    # Make CSRF token available in all templates
+    @app.context_processor
+    def inject_csrf_token():
+        from flask_wtf.csrf import generate_csrf
+        return dict(csrf_token=generate_csrf)
 
     # Setup logging
     from app.core.logging_config import setup_logging

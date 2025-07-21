@@ -90,7 +90,7 @@
                 <h5 class="card-title">Last Check</h5>
                 <p class="card-text">
                     {% if stats.last_health_check %}
-                        {{ moment(stats.last_health_check).fromNow() }}
+                        {{ stats.last_health_check.strftime('%B %d, %Y') }}
                     {% else %}
                         <span class="text-muted">Never</span>
                     {% endif %}
@@ -220,7 +220,7 @@
                     </div>
                     <div class="col-md-6">
                         <strong>Connected:</strong><br>
-                        {{ moment(customer.salesforce_connection.created_at).fromNow() }}
+                        {{ customer.salesforce_connection.created_at.strftime('%B %d, %Y') }}
                     </div>
                 </div>
             </div>
@@ -274,7 +274,7 @@
                     <div class="col-md-4">
                         <strong>Last API Usage:</strong><br>
                         {% if stats.api_key_last_used %}
-                            {{ moment(stats.api_key_last_used).fromNow() }}
+                            {{ stats.api_key_last_used.strftime('%B %d, %Y at %I:%M %p') }}
                         {% else %}
                             <span class="text-muted">Never used</span>
                         {% endif %}
@@ -292,11 +292,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <script>
-// Add moment.js to Jinja2 context for template usage
-window.moment = moment;
-
 // Auto-refresh dashboard stats every 30 seconds
 setInterval(function() {
     fetch('/dashboard/api/dashboard-stats')

@@ -17,58 +17,138 @@ import secrets
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
+@dashboard_bp.route('/test')
+@login_required
+def test():
+    """Simple test route to verify dashboard access"""
+    current_app.logger.info(f"Test route accessed by user: {current_user.id} ({current_user.email})")
+    return {"status": "success", "message": f"Dashboard access working for {current_user.email}"}
+
+@dashboard_bp.route('/simple')
+@login_required
+def simple():
+    """Simple dashboard without complex logic"""
+    try:
+        current_app.logger.info(f"Simple dashboard accessed by user: {current_user.id} ({current_user.email})")
+        customer = get_or_create_customer()
+        current_app.logger.info(f"Customer obtained: {customer.id}")
+        
+        # Create minimal template content
+        simple_stats = {
+            'has_salesforce_connection': False,
+            'has_api_key': False,
+            'total_health_checks': 0,
+            'last_health_check': None,
+            'api_key_last_used': None
+        }
+        
+        return f"""
+        <html><head><title>Simple Dashboard</title></head><body>
+        <h1>Welcome {current_user.email}!</h1>
+        <p>Customer ID: {customer.id}</p>
+        <p>Stats: {simple_stats}</p>
+        <a href="/dashboard/">Back to Full Dashboard</a>
+        </body></html>
+        """
+        
+    except Exception as e:
+        current_app.logger.error(f"Simple dashboard error: {str(e)}")
+        return f"Error: {str(e)}", 500
+
 def get_or_create_customer():
     """Get or create customer record for current user"""
-    customer = current_user.customer
-    
-    if not customer:
-        customer = Customer(
-            email=current_user.email,
-            user_id=current_user.id
-        )
-        db.session.add(customer)
-        db.session.commit()
-        db.session.refresh(customer)
-    
-    return customer
+    try:
+        current_app.logger.info(f"Getting customer for user {current_user.id} ({current_user.email})")
+        customer = current_user.customer
+        current_app.logger.info(f"Existing customer: {customer.id if customer else 'None'}")
+        
+        if not customer:
+            current_app.logger.info("Creating new customer record...")
+            customer = Customer(
+                email=current_user.email,
+                user_id=current_user.id
+            )
+            db.session.add(customer)
+            current_app.logger.info("Customer added to session, committing...")
+            db.session.commit()
+            current_app.logger.info("Customer committed, refreshing...")
+            db.session.refresh(customer)
+            current_app.logger.info(f"New customer created with ID: {customer.id}")
+        
+        return customer
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in get_or_create_customer: {str(e)}")
+        current_app.logger.exception("Customer creation error details:")
+        db.session.rollback()
+        raise
 
 @dashboard_bp.route('/')
 @login_required
 def index():
     """Main dashboard page"""
-    # Get or create user's customer record
-    customer = get_or_create_customer()
-    
-    # Dashboard statistics
-    stats = {
-        'has_salesforce_connection': bool(customer and customer.salesforce_connection),
-        'has_api_key': bool(customer and customer.api_key),
-        'total_health_checks': 0,
-        'last_health_check': None,
-        'api_key_last_used': None
-    }
-    
-    if customer:
-        # Get health check statistics
-        stats['total_health_checks'] = HealthCheckHistory.query.filter_by(
-            user_id=current_user.id,
-            customer_id=customer.id
-        ).count()
+    try:
+        current_app.logger.info(f"Dashboard accessed by user: {current_user.id} ({current_user.email})")
         
-        # Get last health check
-        last_check = HealthCheckHistory.query.filter_by(
-            user_id=current_user.id,
-            customer_id=customer.id
-        ).order_by(HealthCheckHistory.created_at.desc()).first()
+        # Get or create user's customer record
+        current_app.logger.info("Getting or creating customer record...")
+        customer = get_or_create_customer()
+        current_app.logger.info(f"Customer record obtained: ID={customer.id if customer else None}")
         
-        if last_check:
-            stats['last_health_check'] = last_check.created_at
+        # Dashboard statistics
+        current_app.logger.info("Initializing dashboard statistics...")
+        stats = {
+            'has_salesforce_connection': bool(customer and customer.salesforce_connection),
+            'has_api_key': bool(customer and customer.api_key),
+            'total_health_checks': 0,
+            'last_health_check': None,
+            'api_key_last_used': None
+        }
+        current_app.logger.info(f"Initial stats: {stats}")
         
-        # Get API key last used
-        if customer.api_key:
-            stats['api_key_last_used'] = customer.api_key.last_used
-    
-    return render_template('dashboard/index.html', stats=stats, customer=customer)
+        if customer:
+            try:
+                current_app.logger.info("Querying health check statistics...")
+                # Get health check statistics
+                stats['total_health_checks'] = HealthCheckHistory.query.filter_by(
+                    user_id=current_user.id,
+                    customer_id=customer.id
+                ).count()
+                current_app.logger.info(f"Health check count: {stats['total_health_checks']}")
+                
+                # Get last health check
+                current_app.logger.info("Querying last health check...")
+                last_check = HealthCheckHistory.query.filter_by(
+                    user_id=current_user.id,
+                    customer_id=customer.id
+                ).order_by(HealthCheckHistory.created_at.desc()).first()
+                
+                if last_check:
+                    stats['last_health_check'] = last_check.created_at
+                    current_app.logger.info(f"Last health check: {stats['last_health_check']}")
+                else:
+                    current_app.logger.info("No health checks found")
+                
+                # Get API key last used
+                current_app.logger.info("Checking API key...")
+                if customer.api_key:
+                    stats['api_key_last_used'] = customer.api_key.last_used
+                    current_app.logger.info(f"API key last used: {stats['api_key_last_used']}")
+                else:
+                    current_app.logger.info("No API key found")
+                    
+            except Exception as e:
+                current_app.logger.error(f"Error getting statistics: {str(e)}")
+                current_app.logger.exception("Statistics error details:")
+        
+        current_app.logger.info("Rendering dashboard template...")
+        return render_template('dashboard/index.html', stats=stats, customer=customer)
+        
+    except Exception as e:
+        current_app.logger.error(f"Dashboard error: {str(e)}")
+        current_app.logger.exception("Full dashboard error details:")
+        # Re-raise to trigger the error handler
+        raise
 
 @dashboard_bp.route('/salesforce')
 @login_required

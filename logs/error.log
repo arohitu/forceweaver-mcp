@@ -4,3 +4,4 @@
 2025-07-18 23:22:18,112 [ERROR] app.core.security:41: Error encrypting token: Fernet key must be 32 url-safe base64-encoded bytes.
 2025-07-18 23:23:12,538 [ERROR] app.core.errors:153: Unexpected Error: 405 Method Not Allowed: The method is not allowed for the requested URL.
 2025-07-18 23:26:36,784 [ERROR] app.core.security:41: Error encrypting token: Fernet key must be 32 url-safe base64-encoded bytes.
+2025-07-21 10:40:23,743 [ERROR] app.core.errors:153: Unexpected Error: 'CSRFProtect' object has no attribute 'generate_csrf'
