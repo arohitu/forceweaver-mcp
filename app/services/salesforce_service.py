@@ -89,9 +89,15 @@ def get_salesforce_api_client(connection, api_version=None):
         
         # Step 2: Instantiate the Salesforce client with the specific API version
         logger.info(f"=== SALESFORCE CLIENT INITIALIZATION ===")
+        
+        # Fix: simple-salesforce expects version without 'v' prefix (e.g., '64.0' not 'v64.0')
+        # Our get_effective_api_version returns 'v64.0', so we need to strip the 'v'
+        version_number = api_version.lstrip('v') if api_version.startswith('v') else api_version
+        
         logger.info(f"Creating Salesforce client with:")
         logger.info(f"  Instance URL: {connection.instance_url}")
-        logger.info(f"  API Version: {api_version}")
+        logger.info(f"  API Version (original): {api_version}")
+        logger.info(f"  API Version (for SF client): {version_number}")
         logger.info(f"  Session ID Length: {len(new_access_token)}")
         
         sf = Salesforce(
@@ -99,7 +105,7 @@ def get_salesforce_api_client(connection, api_version=None):
             session_id=new_access_token,
             consumer_key=Config.SALESFORCE_CLIENT_ID,
             consumer_secret=Config.SALESFORCE_CLIENT_SECRET,
-            version=api_version  # Specify the API version
+            version=version_number  # Pass version without 'v' prefix
         )
         
         logger.info("=== Salesforce Client Created Successfully ===")
