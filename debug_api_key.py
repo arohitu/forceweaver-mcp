@@ -44,7 +44,6 @@ def debug_api_key(api_key_value):
         if customer:
             print(f"✅ Found customer record:")
             print(f"   ID: {customer.id}")
-            print(f"   Name: {customer.name}")
             print(f"   Email: {customer.email}")
             print(f"   Created: {customer.created_at}")
         else:
