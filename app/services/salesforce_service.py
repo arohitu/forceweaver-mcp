@@ -27,11 +27,15 @@ def get_salesforce_api_client(connection, api_version=None):
         if not api_version:
             api_version = connection.get_effective_api_version()
             
-        logger.info(f"Refreshing token for {'sandbox' if connection.is_sandbox else 'production'} org")
-        logger.info(f"Using token URL: {token_url}")
-        logger.info(f"Using API version: {api_version}")
+        logger.info("=== Salesforce Client Creation Debug ===")
+        logger.info(f"Creating SF client for {'sandbox' if connection.is_sandbox else 'production'} org")
+        logger.info(f"Customer ID: {getattr(connection, 'customer_id', 'Unknown')}")
+        logger.info(f"Org ID: {connection.salesforce_org_id}")
+        logger.info(f"Token URL: {token_url}")
+        logger.info(f"API Version: {api_version}")
         logger.info(f"Instance URL: {connection.instance_url}")
         logger.info(f"Client ID: {Config.SALESFORCE_CLIENT_ID}")
+        logger.info(f"Refresh token length: {len(decrypted_refresh_token) if decrypted_refresh_token else 0} chars")
         
         refresh_data = {
             'grant_type': 'refresh_token',
@@ -44,14 +48,27 @@ def get_salesforce_api_client(connection, api_version=None):
         response = requests.post(token_url, data=refresh_data)
         
         logger.info(f"Token refresh response status: {response.status_code}")
+        logger.info(f"Response headers: {dict(response.headers)}")
+        
         if response.status_code != 200:
             logger.error(f"Token refresh failed. Response text: {response.text}")
-            logger.error(f"Response headers: {dict(response.headers)}")
+            logger.error(f"Request data keys: {list(refresh_data.keys())}")
+            logger.error(f"Client ID present: {bool(Config.SALESFORCE_CLIENT_ID)}")
+            logger.error(f"Client Secret present: {bool(Config.SALESFORCE_CLIENT_SECRET)}")
             
         response.raise_for_status()  # This will raise an error for bad responses (4xx or 5xx)
         
         new_token_data = response.json()
         new_access_token = new_token_data.get('access_token')
+        
+        logger.info(f"Token response keys: {list(new_token_data.keys())}")
+        logger.info(f"Access token present: {bool(new_access_token)}")
+        logger.info(f"Access token length: {len(new_access_token) if new_access_token else 0} chars")
+        
+        if 'instance_url' in new_token_data:
+            logger.info(f"Instance URL from token: {new_token_data['instance_url']}")
+            if new_token_data['instance_url'] != connection.instance_url:
+                logger.warning(f"Instance URL mismatch! Stored: {connection.instance_url}, Token: {new_token_data['instance_url']}")
 
         if not new_access_token:
             logger.error(f"No access token in response: {new_token_data}")
@@ -60,6 +77,7 @@ def get_salesforce_api_client(connection, api_version=None):
         logger.info("Successfully obtained new access token")
         
         # Step 2: Instantiate the Salesforce client with the specific API version
+        logger.info(f"Creating Salesforce client with version: {api_version}")
         sf = Salesforce(
             instance_url=connection.instance_url,
             session_id=new_access_token,
@@ -67,9 +85,35 @@ def get_salesforce_api_client(connection, api_version=None):
             consumer_secret=Config.SALESFORCE_CLIENT_SECRET,
             version=api_version  # Specify the API version
         )
+        
+        logger.info("=== Salesforce Client Created Successfully ===")
+        logger.info(f"SF Client type: {type(sf)}")
+        logger.info(f"SF Base URL: {sf.base_url}")
+        logger.info(f"SF Version: {sf.version}")
+        logger.info(f"SF Session ID length: {len(sf.session_id) if sf.session_id else 0}")
+        
+        # Test the client with a simple query
+        try:
+            logger.info("Testing SF client with simple query...")
+            test_result = sf.query("SELECT Id FROM User LIMIT 1")
+            logger.info(f"✅ SF client test successful - returned {test_result['totalSize']} records")
+        except Exception as test_error:
+            logger.error(f"❌ SF client test failed: {str(test_error)}")
+            logger.error(f"Test error type: {type(test_error).__name__}")
+            if hasattr(test_error, 'response'):
+                logger.error(f"Test error status: {getattr(test_error.response, 'status_code', 'N/A')}")
+                logger.error(f"Test error response: {getattr(test_error.response, 'text', 'N/A')}")
+        
         return sf
     except Exception as e:
-        logger.error(f"Failed to create Salesforce client: {str(e)}")
+        logger.error(f"=== Salesforce Client Creation Failed ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        
+        if hasattr(e, 'response'):
+            logger.error(f"HTTP Status: {getattr(e.response, 'status_code', 'N/A')}")
+            logger.error(f"HTTP Response: {getattr(e.response, 'text', 'N/A')}")
+            
         raise ValueError(f"Failed to create Salesforce client: {str(e)}")
 
 def exchange_code_for_tokens(authorization_code, redirect_uri, code_verifier, token_url="https://login.salesforce.com/services/oauth2/token"):

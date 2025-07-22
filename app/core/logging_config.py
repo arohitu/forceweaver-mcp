@@ -38,6 +38,20 @@ def setup_logging(app):
                 'filename': 'logs/error.log',
                 'mode': 'a',
             },
+            'debug_file': {
+                'level': 'DEBUG',
+                'formatter': 'detailed',
+                'class': 'logging.FileHandler',
+                'filename': 'logs/debug.log',
+                'mode': 'a',
+            },
+            'health_check_file': {
+                'level': 'INFO',
+                'formatter': 'detailed',
+                'class': 'logging.FileHandler',
+                'filename': 'logs/health_checks.log',
+                'mode': 'a',
+            }
         },
         'loggers': {
             '': {  # root logger
@@ -46,8 +60,18 @@ def setup_logging(app):
                 'propagate': False
             },
             'app': {
-                'handlers': ['default', 'error_file'],
-                'level': log_level,
+                'handlers': ['default', 'error_file', 'debug_file'],
+                'level': 'DEBUG',  # Capture all app logs in debug file
+                'propagate': False
+            },
+            'app.services.health_checker_service': {
+                'handlers': ['default', 'error_file', 'health_check_file'],
+                'level': 'DEBUG',  # Capture all health check logs
+                'propagate': False
+            },
+            'app.services.salesforce_service': {
+                'handlers': ['default', 'error_file', 'debug_file'],
+                'level': 'DEBUG',  # Capture all Salesforce service logs
                 'propagate': False
             },
             'gunicorn.error': {
@@ -73,4 +97,5 @@ def setup_logging(app):
     app.logger.setLevel(getattr(logging, log_level))
     
     # Log startup message
-    app.logger.info(f"ForceWeaver MCP API starting with log level: {log_level}") 
+    app.logger.info(f"ForceWeaver MCP API starting with log level: {log_level}")
+    app.logger.info("Health check debugging enabled - check logs/health_checks.log for detailed output") 

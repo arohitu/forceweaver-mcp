@@ -5,6 +5,115 @@ from app.services.health_checker_service import RevenueCloudHealthChecker
 
 mcp_bp = Blueprint('mcp', __name__)
 
+@mcp_bp.route('/debug', methods=['POST'])
+@require_api_key
+def debug_connection():
+    """Debug Salesforce connection and basic functionality."""
+    try:
+        # g.customer is attached by the decorator
+        connection = g.customer.salesforce_connection
+        if not connection:
+            return jsonify({"error": "No Salesforce connection found for this customer."}), 400
+
+        # Ensure we have API versions available
+        try:
+            update_connection_api_versions(connection)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Could not update API versions: {e}")
+
+        # Get the effective API version to use
+        api_version = connection.get_effective_api_version()
+        
+        # Create Salesforce client with the preferred API version
+        sf_client = get_salesforce_api_client(connection, api_version=api_version)
+        
+        # Test basic queries
+        debug_results = {}
+        
+        # Test 1: Basic User query
+        try:
+            user_result = sf_client.query("SELECT Id, Name FROM User LIMIT 1")
+            debug_results['user_query'] = {
+                'status': 'success',
+                'record_count': user_result['totalSize'],
+                'sample_record': user_result['records'][0] if user_result['records'] else None
+            }
+        except Exception as e:
+            debug_results['user_query'] = {
+                'status': 'error',
+                'error': str(e),
+                'error_type': type(e).__name__
+            }
+        
+        # Test 2: Organization query
+        try:
+            org_result = sf_client.query("SELECT Id, Name, OrganizationType FROM Organization LIMIT 1")
+            debug_results['org_query'] = {
+                'status': 'success',
+                'record_count': org_result['totalSize'],
+                'org_info': org_result['records'][0] if org_result['records'] else None
+            }
+        except Exception as e:
+            debug_results['org_query'] = {
+                'status': 'error',
+                'error': str(e),
+                'error_type': type(e).__name__
+            }
+        
+        # Test 3: Product2 query (Revenue Cloud)
+        try:
+            product_result = sf_client.query("SELECT Id, Name FROM Product2 LIMIT 1")
+            debug_results['product_query'] = {
+                'status': 'success',
+                'record_count': product_result['totalSize']
+            }
+        except Exception as e:
+            debug_results['product_query'] = {
+                'status': 'error',
+                'error': str(e),
+                'error_type': type(e).__name__
+            }
+        
+        # Test 4: EntityDefinition query (Metadata API)
+        try:
+            entity_result = sf_client.query("SELECT QualifiedApiName FROM EntityDefinition LIMIT 1")
+            debug_results['entity_definition_query'] = {
+                'status': 'success',
+                'record_count': entity_result['totalSize']
+            }
+        except Exception as e:
+            debug_results['entity_definition_query'] = {
+                'status': 'error',
+                'error': str(e),
+                'error_type': type(e).__name__
+            }
+
+        return jsonify({
+            "success": True,
+            "customer_id": g.customer.id,
+            "salesforce_org_id": connection.salesforce_org_id,
+            "api_version_used": api_version,
+            "instance_url": connection.instance_url,
+            "sf_client_info": {
+                "base_url": getattr(sf_client, 'base_url', 'Unknown'),
+                "version": getattr(sf_client, 'version', 'Unknown'),
+                "session_id_length": len(sf_client.session_id) if hasattr(sf_client, 'session_id') and sf_client.session_id else 0
+            },
+            "debug_results": debug_results
+        })
+    
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Debug connection failed: {str(e)}", exc_info=True)
+        
+        return jsonify({
+            "success": False,
+            "error": f"Debug failed: {str(e)}",
+            "error_type": type(e).__name__
+        }), 500
+
 @mcp_bp.route('/health-check', methods=['POST'])
 @require_api_key
 def perform_health_check():

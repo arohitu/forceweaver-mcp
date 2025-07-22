@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,127 @@ class RevenueCloudHealthChecker:
         self.total_checks = 4  # org info, OWD sharing, combined bundle checks, and attribute picklist integrity
         self.current_check = 0
         
+        # Add debugging information about the Salesforce client
+        self._log_client_info()
+        
+    def _log_client_info(self):
+        """Log debugging information about the Salesforce client."""
+        try:
+            logger.info("=== Salesforce Client Debug Info ===")
+            logger.info(f"SF Client type: {type(self.sf)}")
+            logger.info(f"SF Instance URL: {getattr(self.sf, 'base_url', 'Not Available')}")
+            logger.info(f"SF API Version: {getattr(self.sf, 'version', 'Not Available')}")
+            
+            if hasattr(self.sf, 'session_id') and self.sf.session_id:
+                logger.info(f"SF Session ID (first 10 chars): {self.sf.session_id[:10]}...")
+            else:
+                logger.warning("No session ID found in SF client")
+                
+        except Exception as e:
+            logger.error(f"Error logging SF client info: {e}")
+        
+    def _safe_query(self, query, check_name, description=""):
+        """Safely execute a SOQL query with detailed error handling."""
+        try:
+            logger.info(f"=== {check_name} Query Debug ===")
+            logger.info(f"Description: {description}")
+            logger.info(f"Query: {query}")
+            
+            # First, let's check if we can make any query at all
+            if not hasattr(self.sf, 'query'):
+                logger.error("SF client does not have query method")
+                raise Exception("SF client does not have query method")
+            
+            # Execute the query
+            start_time = time.time()
+            result = self.sf.query(query)
+            end_time = time.time()
+            
+            logger.info(f"Query executed successfully in {end_time - start_time:.2f}s")
+            logger.info(f"Total records returned: {result.get('totalSize', 'Unknown')}")
+            
+            if result.get('totalSize', 0) > 0:
+                logger.info(f"Sample record keys: {list(result['records'][0].keys()) if result.get('records') else 'No records'}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"=== {check_name} Query Failed ===")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error message: {str(e)}")
+            
+            # Try to get more detailed error information
+            if hasattr(e, 'response'):
+                logger.error(f"HTTP Status Code: {e.response.status_code if hasattr(e.response, 'status_code') else 'N/A'}")
+                logger.error(f"HTTP Response Text: {e.response.text if hasattr(e.response, 'text') else 'N/A'}")
+            
+            # Try to parse any JSON error response
+            try:
+                if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                    error_data = json.loads(e.response.text)
+                    logger.error(f"Parsed error response: {json.dumps(error_data, indent=2)}")
+            except:
+                pass
+            
+            raise e
+    
+    def _safe_query_all(self, query, check_name, description=""):
+        """Safely execute a SOQL query_all with detailed error handling."""
+        try:
+            logger.info(f"=== {check_name} Query_All Debug ===")
+            logger.info(f"Description: {description}")
+            logger.info(f"Query: {query}")
+            
+            if not hasattr(self.sf, 'query_all'):
+                logger.error("SF client does not have query_all method")
+                raise Exception("SF client does not have query_all method")
+            
+            start_time = time.time()
+            result = self.sf.query_all(query)
+            end_time = time.time()
+            
+            logger.info(f"Query_all executed successfully in {end_time - start_time:.2f}s")
+            logger.info(f"Total records returned: {result.get('totalSize', 'Unknown')}")
+            
+            if result.get('totalSize', 0) > 0:
+                logger.info(f"Sample record keys: {list(result['records'][0].keys()) if result.get('records') else 'No records'}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"=== {check_name} Query_All Failed ===")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error message: {str(e)}")
+            
+            if hasattr(e, 'response'):
+                logger.error(f"HTTP Status Code: {e.response.status_code if hasattr(e.response, 'status_code') else 'N/A'}")
+                logger.error(f"HTTP Response Text: {e.response.text if hasattr(e.response, 'text') else 'N/A'}")
+            
+            try:
+                if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                    error_data = json.loads(e.response.text)
+                    logger.error(f"Parsed error response: {json.dumps(error_data, indent=2)}")
+            except:
+                pass
+            
+            raise e
+    
+    def _test_basic_connectivity(self):
+        """Test basic connectivity by trying a simple query first."""
+        try:
+            logger.info("=== Testing Basic Connectivity ===")
+            
+            # Try the most basic query possible
+            basic_query = "SELECT Id FROM User LIMIT 1"
+            result = self._safe_query(basic_query, "Basic Connectivity Test", "Testing if we can query anything at all")
+            
+            logger.info("✅ Basic connectivity test passed")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Basic connectivity test failed: {str(e)}")
+            return False
+    
     def update_progress(self, check_name, status="in_progress", percentage=None):
         """Update progress for the current session."""
         if self.session_id:
@@ -64,9 +186,23 @@ class RevenueCloudHealthChecker:
         self.update_progress("Basic Organization Info", "in_progress")
         
         try:
+            # Test basic connectivity first
+            if not self._test_basic_connectivity():
+                self.add_result(
+                    "Basic Organization Info",
+                    "failed",
+                    "Failed basic connectivity test - cannot execute any SOQL queries",
+                    severity="error"
+                )
+                return
+            
             # Get organization info
             org_query = "SELECT Id, Name, OrganizationType, InstanceName, IsSandbox, TrialExpirationDate FROM Organization LIMIT 1"
-            org_result = self.sf.query(org_query)
+            org_result = self._safe_query(
+                org_query, 
+                "Organization Info Query",
+                "Querying Organization object for basic org information"
+            )
             
             if org_result['totalSize'] > 0:
                 org_info = org_result['records'][0]
@@ -79,6 +215,12 @@ class RevenueCloudHealthChecker:
                 
                 if org_info.get('TrialExpirationDate'):
                     details.append(f"Trial Expiration: {org_info['TrialExpirationDate']}")
+                
+                # Add debug info
+                details.append("🔧 Debug Information:")
+                details.append(f"   Query executed successfully")
+                details.append(f"   API Version: {getattr(self.sf, 'version', 'Unknown')}")
+                details.append(f"   Instance URL: {getattr(self.sf, 'base_url', 'Unknown')}")
                 
                 self.add_result(
                     "Basic Organization Info",
@@ -96,11 +238,22 @@ class RevenueCloudHealthChecker:
                 )
                 
         except Exception as e:
+            logger.error(f"Organization info check failed with error: {str(e)}")
+            
+            details = [
+                "🔧 Debug Information:",
+                f"   Error Type: {type(e).__name__}",
+                f"   Error Message: {str(e)}",
+                f"   API Version: {getattr(self.sf, 'version', 'Unknown')}",
+                f"   Instance URL: {getattr(self.sf, 'base_url', 'Unknown')}"
+            ]
+            
             self.add_result(
                 "Basic Organization Info",
                 "failed",
                 f"Error retrieving organization information: {str(e)}",
-                severity="error"
+                details,
+                "error"
             )
         
         self.update_progress("Basic Organization Info", "completed")
@@ -126,7 +279,11 @@ class RevenueCloudHealthChecker:
                 WHERE QualifiedApiName IN ({','.join(objects_quoted)})
             """
             
-            sharing_results = self.sf.query_all(sharing_query)
+            sharing_results = self._safe_query_all(
+                sharing_query,
+                "OWD Sharing Settings Query",
+                "Querying EntityDefinition for OWD sharing settings"
+            )
             
             if sharing_results['totalSize'] == 0:
                 self.add_result(
@@ -203,11 +360,22 @@ class RevenueCloudHealthChecker:
             )
             
         except Exception as e:
+            logger.error(f"OWD sharing check failed with error: {str(e)}")
+            
+            details = [
+                "🔧 Debug Information:",
+                f"   Error Type: {type(e).__name__}",
+                f"   Error Message: {str(e)}",
+                f"   API Version: {getattr(self.sf, 'version', 'Unknown')}",
+                f"   Instance URL: {getattr(self.sf, 'base_url', 'Unknown')}"
+            ]
+            
             self.add_result(
                 "OWD Sharing Settings Check",
                 "failed",
                 f"Error checking OWD sharing settings: {str(e)}",
-                severity="error"
+                details,
+                "error"
             )
         
         self.update_progress("OWD Sharing Settings", "completed")
@@ -226,7 +394,11 @@ class RevenueCloudHealthChecker:
                 AND IsActive = true
             """
             
-            bundle_results = self.sf.query_all(bundle_query)
+            bundle_results = self._safe_query_all(
+                bundle_query,
+                "Bundle Analysis Query",
+                "Querying Product2 for bundle products"
+            )
             
             if bundle_results['totalSize'] == 0:
                 # Both checks pass with no bundles
@@ -254,7 +426,11 @@ class RevenueCloudHealthChecker:
                 WHERE ParentProductId != NULL AND ChildProductId != NULL
             """
             
-            component_results = self.sf.query_all(component_query)
+            component_results = self._safe_query_all(
+                component_query,
+                "ProductRelatedComponent Query",
+                "Querying ProductRelatedComponent for bundle components"
+            )
             
             # Build parent-child relationship map (used by both checks)
             parent_child_map = {}
@@ -284,11 +460,22 @@ class RevenueCloudHealthChecker:
                 attribute_override_future.result()
             
         except Exception as e:
+            logger.error(f"Bundle analysis failed with error: {str(e)}")
+            
+            details = [
+                "🔧 Debug Information:",
+                f"   Error Type: {type(e).__name__}",
+                f"   Error Message: {str(e)}",
+                f"   API Version: {getattr(self.sf, 'version', 'Unknown')}",
+                f"   Instance URL: {getattr(self.sf, 'base_url', 'Unknown')}"
+            ]
+            
             self.add_result(
                 "Bundle Analysis",
                 "failed",
                 f"Error in bundle analysis: {str(e)}",
-                severity="error"
+                details,
+                "error"
             )
             self.add_result(
                 "Attribute Override Check",
@@ -449,11 +636,22 @@ class RevenueCloudHealthChecker:
             )
             
         except Exception as e:
+            logger.error(f"Bundle analysis failed with error: {str(e)}")
+            
+            details = [
+                "🔧 Debug Information:",
+                f"   Error Type: {type(e).__name__}",
+                f"   Error Message: {str(e)}",
+                f"   API Version: {getattr(self.sf, 'version', 'Unknown')}",
+                f"   Instance URL: {getattr(self.sf, 'base_url', 'Unknown')}"
+            ]
+            
             self.add_result(
                 "Bundle Analysis",
                 "failed",
                 f"Error analyzing bundle hierarchy: {str(e)}",
-                severity="error"
+                details,
+                "error"
             )
     
     def _process_attribute_override_check(self, bundle_products, parent_child_map):
@@ -477,7 +675,11 @@ class RevenueCloudHealthChecker:
                     id_list = "','".join(all_product_ids)
                     query = f"SELECT COUNT(Id) FROM ProductAttributeDefinition WHERE Product2Id IN ('{id_list}')"
                     
-                    count_result = self.sf.query(query)
+                    count_result = self._safe_query(
+                        query,
+                        "Attribute Override Count Query",
+                        f"Querying ProductAttributeDefinition for bundle '{bundle_name}'"
+                    )
                     attribute_count = count_result['totalSize']
                     
                     violation = None
@@ -546,11 +748,22 @@ class RevenueCloudHealthChecker:
             )
             
         except Exception as e:
+            logger.error(f"Attribute override check failed with error: {str(e)}")
+            
+            details = [
+                "🔧 Debug Information:",
+                f"   Error Type: {type(e).__name__}",
+                f"   Error Message: {str(e)}",
+                f"   API Version: {getattr(self.sf, 'version', 'Unknown')}",
+                f"   Instance URL: {getattr(self.sf, 'base_url', 'Unknown')}"
+            ]
+            
             self.add_result(
                 "Attribute Override Check",
                 "failed",
                 f"Error in attribute override check: {str(e)}",
-                severity="error"
+                details,
+                "error"
             )
     
     def _get_all_products_in_bundle_optimized(self, product_id, parent_child_map, visited_products=None):
@@ -709,7 +922,11 @@ class RevenueCloudHealthChecker:
                 WHERE Status = 'Active'
             """
             
-            picklist_results = self.sf.query_all(picklist_query)
+            picklist_results = self._safe_query_all(
+                picklist_query,
+                "AttributePicklist Query",
+                "Querying AttributePicklist for active picklists"
+            )
             
             if picklist_results['totalSize'] == 0:
                 self.add_result(
@@ -727,7 +944,11 @@ class RevenueCloudHealthChecker:
                 WHERE PicklistId != NULL AND IsActive = true
             """
             
-            definition_results = self.sf.query_all(definition_query)
+            definition_results = self._safe_query_all(
+                definition_query,
+                "AttributeDefinition Query",
+                "Querying AttributeDefinition for picklist references"
+            )
             
             # Query all AttributePicklistValue records
             value_query = """
@@ -737,7 +958,11 @@ class RevenueCloudHealthChecker:
                 WHERE PicklistId != NULL
             """
             
-            value_results = self.sf.query_all(value_query)
+            value_results = self._safe_query_all(
+                value_query,
+                "AttributePicklistValue Query",
+                "Querying AttributePicklistValue for picklist values"
+            )
             
             # Process the data
             self._process_attribute_picklist_data(
@@ -747,11 +972,22 @@ class RevenueCloudHealthChecker:
             )
             
         except Exception as e:
+            logger.error(f"Attribute picklist integrity check failed with error: {str(e)}")
+            
+            details = [
+                "🔧 Debug Information:",
+                f"   Error Type: {type(e).__name__}",
+                f"   Error Message: {str(e)}",
+                f"   API Version: {getattr(self.sf, 'version', 'Unknown')}",
+                f"   Instance URL: {getattr(self.sf, 'base_url', 'Unknown')}"
+            ]
+            
             self.add_result(
                 "Attribute Picklist Integrity",
                 "failed",
                 f"Error checking attribute picklist integrity: {str(e)}",
-                severity="error"
+                details,
+                "error"
             )
         
         self.update_progress("Attribute Picklist Integrity", "completed")
@@ -889,18 +1125,245 @@ class RevenueCloudHealthChecker:
             severity
         )
     
+    def _test_object_availability(self):
+        """Test availability of key Revenue Cloud objects."""
+        try:
+            logger.info("=== Testing Object Availability ===")
+            
+            # List of objects we need for Revenue Cloud health checks
+            required_objects = [
+                'Organization',       # Standard object - should always exist
+                'User',              # Standard object - should always exist  
+                'EntityDefinition',   # Metadata object - might not be accessible
+                'Product2',          # Revenue Cloud object
+                'ProductRelatedComponent',  # Revenue Cloud object
+                'AttributeDefinition',      # Revenue Cloud object
+                'AttributePicklist',        # Revenue Cloud object
+                'AttributePicklistValue',   # Revenue Cloud object
+                'ProductAttributeDefinition' # Revenue Cloud object
+            ]
+            
+            available_objects = []
+            unavailable_objects = []
+            
+            for obj_name in required_objects:
+                try:
+                    # Try a simple query to check if object exists and is accessible
+                    test_query = f"SELECT Id FROM {obj_name} LIMIT 1"
+                    result = self._safe_query(test_query, f"{obj_name} Availability Test", f"Testing access to {obj_name} object")
+                    available_objects.append(obj_name)
+                    logger.info(f"✅ {obj_name}: Available ({result.get('totalSize', 0)} records)")
+                    
+                except Exception as e:
+                    unavailable_objects.append({
+                        'object': obj_name,
+                        'error': str(e),
+                        'error_type': type(e).__name__
+                    })
+                    logger.error(f"❌ {obj_name}: Not available - {str(e)}")
+            
+            # Log summary
+            logger.info(f"Object availability check complete:")
+            logger.info(f"  Available: {len(available_objects)} objects")
+            logger.info(f"  Unavailable: {len(unavailable_objects)} objects")
+            
+            return {
+                'available': available_objects,
+                'unavailable': unavailable_objects,
+                'total_tested': len(required_objects)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error during object availability check: {str(e)}")
+            return {
+                'available': [],
+                'unavailable': [],
+                'total_tested': 0,
+                'error': str(e)
+            }
+    
+    def run_object_availability_check(self):
+        """Check which Revenue Cloud objects are available in the org."""
+        self.current_check += 1
+        self.update_progress("Object Availability Check", "in_progress")
+        
+        try:
+            availability_info = self._test_object_availability()
+            
+            available_objects = availability_info.get('available', [])
+            unavailable_objects = availability_info.get('unavailable', [])
+            
+            details = []
+            details.append(f"Tested {availability_info.get('total_tested', 0)} objects for availability")
+            
+            # Available objects section
+            details.append("✅ Available Objects:")
+            if available_objects:
+                for obj in available_objects:
+                    details.append(f"   • {obj}")
+            else:
+                details.append("   • No objects available")
+            
+            # Unavailable objects section
+            details.append("❌ Unavailable Objects:")
+            if unavailable_objects:
+                for obj_info in unavailable_objects:
+                    obj_name = obj_info['object']
+                    error = obj_info['error']
+                    details.append(f"   • {obj_name}: {error}")
+            else:
+                details.append("   • All tested objects are available")
+            
+            # Determine Revenue Cloud availability
+            revenue_cloud_objects = [
+                'Product2', 'ProductRelatedComponent', 'AttributeDefinition', 
+                'AttributePicklist', 'AttributePicklistValue', 'ProductAttributeDefinition'
+            ]
+            
+            available_rc_objects = [obj for obj in available_objects if obj in revenue_cloud_objects]
+            unavailable_rc_objects = [obj_info['object'] for obj_info in unavailable_objects if obj_info['object'] in revenue_cloud_objects]
+            
+            details.append("📦 Revenue Cloud Analysis:")
+            details.append(f"   Available RC objects: {len(available_rc_objects)}/{len(revenue_cloud_objects)}")
+            
+            if unavailable_rc_objects:
+                details.append("🔧 Recommendations:")
+                details.append("   • Revenue Cloud objects are not available in this org")
+                details.append("   • This may indicate that Revenue Cloud is not enabled")
+                details.append("   • Contact Salesforce admin to enable Revenue Cloud features")
+                details.append("   • Some health checks will be skipped or show informational messages")
+            
+            # Determine overall status
+            standard_objects = ['Organization', 'User']
+            available_standard = [obj for obj in available_objects if obj in standard_objects]
+            
+            if len(available_standard) == len(standard_objects):
+                if len(available_rc_objects) == len(revenue_cloud_objects):
+                    status = "passed"
+                    message = "All objects available - Revenue Cloud is fully accessible"
+                    severity = "info"
+                elif len(available_rc_objects) > 0:
+                    status = "warning" 
+                    message = f"Partial Revenue Cloud access - {len(available_rc_objects)}/{len(revenue_cloud_objects)} RC objects available"
+                    severity = "warning"
+                else:
+                    status = "warning"
+                    message = "Standard objects available but no Revenue Cloud objects found"
+                    severity = "warning"
+            else:
+                status = "failed"
+                message = "Cannot access basic Salesforce objects - authentication or permission issue"
+                severity = "error"
+            
+            self.add_result(
+                "Object Availability Check",
+                status,
+                message,
+                details,
+                severity
+            )
+            
+            return availability_info
+            
+        except Exception as e:
+            logger.error(f"Object availability check failed with error: {str(e)}")
+            
+            details = [
+                "🔧 Debug Information:",
+                f"   Error Type: {type(e).__name__}",
+                f"   Error Message: {str(e)}",
+                f"   API Version: {getattr(self.sf, 'version', 'Unknown')}",
+                f"   Instance URL: {getattr(self.sf, 'base_url', 'Unknown')}"
+            ]
+            
+            self.add_result(
+                "Object Availability Check", 
+                "failed",
+                f"Error checking object availability: {str(e)}",
+                details,
+                "error"
+            )
+            
+            return {'available': [], 'unavailable': [], 'total_tested': 0}
+        
+        self.update_progress("Object Availability Check", "completed")
+
     def run_all_checks(self):
         """Run all available health checks with optimized queries."""
         self.results = []  # Clear previous results
         self.current_check = 0
+        self.total_checks = 5  # Updated to include object availability check
         
         self.update_progress("Starting Health Checks", "starting", 0)
         
-        # Run individual checks
+        # First, check object availability to determine what checks we can run
+        availability_info = self.run_object_availability_check()
+        available_objects = availability_info.get('available', [])
+        
+        # Run basic org info check (should work with standard objects)
         self.run_basic_org_info_check()
-        self.run_owd_sharing_check()
-        self.run_optimized_bundle_checks()
-        self.run_attribute_picklist_integrity_check()
+        
+        # Run other checks only if required objects are available
+        if 'EntityDefinition' in available_objects:
+            self.run_owd_sharing_check()
+        else:
+            logger.warning("Skipping OWD sharing check - EntityDefinition object not available")
+            self.add_result(
+                "OWD Sharing Settings Check",
+                "info", 
+                "Skipped - EntityDefinition object not accessible (may require special permissions)",
+                ["🔧 This check requires access to the EntityDefinition metadata object"],
+                "info"
+            )
+        
+        # Run Revenue Cloud specific checks only if RC objects are available
+        rc_objects = ['Product2', 'ProductRelatedComponent', 'AttributeDefinition']
+        if all(obj in available_objects for obj in rc_objects):
+            self.run_optimized_bundle_checks()
+        else:
+            logger.warning("Skipping bundle checks - Required Revenue Cloud objects not available")
+            missing_objects = [obj for obj in rc_objects if obj not in available_objects]
+            self.add_result(
+                "Bundle Analysis",
+                "info",
+                "Skipped - Required Revenue Cloud objects not accessible",
+                [
+                    "🔧 Missing objects:",
+                    *[f"   • {obj}" for obj in missing_objects],
+                    "🔧 This indicates Revenue Cloud may not be enabled in this org"
+                ],
+                "info"
+            )
+            self.add_result(
+                "Attribute Override Check", 
+                "info",
+                "Skipped - Required Revenue Cloud objects not accessible",
+                [
+                    "🔧 Missing objects:",
+                    *[f"   • {obj}" for obj in missing_objects],
+                    "🔧 This indicates Revenue Cloud may not be enabled in this org"
+                ],
+                "info"
+            )
+        
+        # Run attribute picklist check if objects are available
+        picklist_objects = ['AttributePicklist', 'AttributeDefinition', 'AttributePicklistValue']
+        if all(obj in available_objects for obj in picklist_objects):
+            self.run_attribute_picklist_integrity_check()
+        else:
+            logger.warning("Skipping attribute picklist check - Required objects not available")
+            missing_objects = [obj for obj in picklist_objects if obj not in available_objects]
+            self.add_result(
+                "Attribute Picklist Integrity",
+                "info", 
+                "Skipped - Required Revenue Cloud objects not accessible",
+                [
+                    "🔧 Missing objects:",
+                    *[f"   • {obj}" for obj in missing_objects],
+                    "🔧 This indicates Revenue Cloud may not be enabled in this org"
+                ],
+                "info"
+            )
         
         self.update_progress("Health Checks Complete", "completed", 100)
         
