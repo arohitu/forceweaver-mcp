@@ -140,6 +140,10 @@ def create_app(config_class=Config):
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(mcp_bp, url_prefix='/api/mcp')
     
+    # Exempt API blueprints from CSRF protection (they use Bearer token auth)
+    csrf.exempt(auth_bp)
+    csrf.exempt(mcp_bp)
+    
     # Web Dashboard Blueprints (for healthcheck.forceweaver.com)
     from app.web.dashboard_routes import dashboard_bp
     from app.web.auth_routes import web_auth_bp
