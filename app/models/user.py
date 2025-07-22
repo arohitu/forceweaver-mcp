@@ -1,96 +1,86 @@
 """
-User model for authentication and user management
+Simple User model for authentication
 """
 import uuid
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
+import bcrypt
 
-class User(UserMixin, db.Model):
-    """User model with authentication support"""
+class User(db.Model):
+    """User model with simple password authentication"""
     __tablename__ = 'users'
     
+    # Primary key
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    name = db.Column(db.String(100), nullable=False)
-    password_hash = db.Column(db.String(128))
     
-    # User status and metadata
+    # User info
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    
+    # Status
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    last_login = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    api_keys = db.relationship('APIKey', backref='user', lazy='dynamic', cascade='all, delete-orphan')
-    salesforce_orgs = db.relationship('SalesforceOrg', backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    api_keys = db.relationship('APIKey', backref='user', lazy='dynamic')
+    salesforce_orgs = db.relationship('SalesforceOrg', backref='user', lazy='dynamic')
     usage_logs = db.relationship('UsageLog', backref='user', lazy='dynamic')
     
     def __init__(self, email, name, password=None):
+        """Initialize user"""
+        self.id = str(uuid.uuid4())
         self.email = email.lower().strip()
         self.name = name.strip()
         if password:
             self.set_password(password)
     
-    def __repr__(self):
-        return f'<User {self.email}>'
-    
     def set_password(self, password):
         """Set password hash"""
-        self.password_hash = generate_password_hash(password)
+        if not password:
+            raise ValueError("Password cannot be empty")
+        
+        # Hash password with bcrypt
+        password_bytes = password.encode('utf-8')
+        salt = bcrypt.gensalt()
+        self.password_hash = bcrypt.hashpw(password_bytes, salt).decode('utf-8')
     
     def check_password(self, password):
-        """Check if provided password matches hash"""
-        if not self.password_hash:
+        """Verify password"""
+        if not password or not self.password_hash:
             return False
-        return check_password_hash(self.password_hash, password)
-    
-    def update_last_login(self):
-        """Update last login timestamp"""
-        self.last_login = datetime.utcnow()
-        db.session.commit()
-    
-    def get_active_api_keys(self):
-        """Get all active API keys for this user"""
-        return self.api_keys.filter_by(is_active=True).all()
-    
-    def get_salesforce_orgs(self):
-        """Get all Salesforce orgs for this user"""
-        return self.salesforce_orgs.filter_by(is_active=True).all()
-    
-    def to_dict(self, include_sensitive=False):
-        """Convert user to dictionary"""
-        data = {
-            'id': self.id,
-            'email': self.email,
-            'name': self.name,
-            'is_active': self.is_active,
-            'is_admin': self.is_admin,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None,
-            'api_keys_count': self.api_keys.filter_by(is_active=True).count(),
-            'orgs_count': self.salesforce_orgs.filter_by(is_active=True).count()
-        }
         
-        return data
+        try:
+            password_bytes = password.encode('utf-8')
+            hash_bytes = self.password_hash.encode('utf-8')
+            return bcrypt.checkpw(password_bytes, hash_bytes)
+        except Exception as e:
+            print(f"Password check error: {e}")
+            return False
     
     @classmethod
-    def create_user(cls, email, name, password, is_admin=False):
+    def create_user(cls, email, name, password):
         """Create a new user"""
+        if cls.query.filter_by(email=email.lower().strip()).first():
+            raise ValueError("User with this email already exists")
+        
         user = cls(email=email, name=name, password=password)
-        user.is_admin = is_admin
         db.session.add(user)
         db.session.commit()
         return user
     
     @classmethod
-    def get_by_email(cls, email):
-        """Get user by email"""
-        return cls.query.filter_by(email=email.lower().strip()).first()
+    def authenticate(cls, email, password):
+        """Authenticate user by email and password"""
+        user = cls.query.filter_by(email=email.lower().strip()).first()
+        if user and user.is_active and user.check_password(password):
+            return user
+        return None
     
-    @classmethod
-    def get_admin_users(cls):
-        """Get all admin users"""
-        return cls.query.filter_by(is_admin=True, is_active=True).all() 
+    def __repr__(self):
+        return f'<User {self.email}>' 

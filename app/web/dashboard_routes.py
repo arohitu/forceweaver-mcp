@@ -1,74 +1,117 @@
 """
-Dashboard routes for authenticated users
+Dashboard routes using simple session-based authentication
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, session
-from flask_login import login_required, current_user
+import secrets
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
+from app import db, get_current_user, login_required
 from app.models.api_key import APIKey
 from app.models.salesforce_org import SalesforceOrg
 from app.models.usage_log import UsageLog
-from app import db
+from app.models.rate_configuration import RateConfiguration
 
 bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 @bp.route('/')
-@login_required
+@login_required 
 def index():
-    """Dashboard home"""
-    current_app.logger.info(f"Dashboard - session received: {dict(session)}")
-    current_app.logger.info(f"Dashboard access attempt - current_user: {current_user}")
-    current_app.logger.info(f"Dashboard - is_authenticated: {current_user.is_authenticated if current_user else 'No current_user'}")
-    current_app.logger.info(f"Dashboard - user ID: {current_user.get_id() if current_user and hasattr(current_user, 'get_id') else 'No ID available'}")
+    """Dashboard home with authentication check"""
+    current_app.logger.info(f"Dashboard access - session: {dict(session)}")
     
-    # Get user stats
-    api_keys_count = APIKey.query.filter_by(user_id=current_user.id, is_active=True).count()
-    orgs_count = SalesforceOrg.query.filter_by(user_id=current_user.id, is_active=True).count()
-    usage_count = UsageLog.query.filter_by(user_id=current_user.id).count()
+    user = get_current_user()
+    if not user:
+        current_app.logger.warning("No authenticated user found")
+        return redirect(url_for('auth.login'))
     
-    # Recent usage
-    recent_usage = UsageLog.query.filter_by(user_id=current_user.id)\
-                                 .order_by(UsageLog.created_at.desc())\
-                                 .limit(5).all()
+    current_app.logger.info(f"Dashboard accessed by user: {user.email}")
     
-    return render_template('dashboard/index.html',
-                         api_keys_count=api_keys_count,
-                         orgs_count=orgs_count,
-                         usage_count=usage_count,
-                         recent_usage=recent_usage)
+    # Get user statistics
+    try:
+        api_keys_count = APIKey.query.filter_by(user_id=user.id, is_active=True).count()
+        orgs_count = SalesforceOrg.query.filter_by(user_id=user.id, is_active=True).count()
+        usage_count = UsageLog.query.filter_by(user_id=user.id).count()
+        
+        # Get recent usage
+        recent_usage = UsageLog.query.filter_by(user_id=user.id)\
+            .order_by(UsageLog.created_at.desc())\
+            .limit(5)\
+            .all()
+        
+        stats = {
+            'api_keys': api_keys_count,
+            'orgs': orgs_count,
+            'total_calls': usage_count,
+            'recent_usage': recent_usage
+        }
+        
+        current_app.logger.info(f"Dashboard stats: {stats}")
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting dashboard stats: {e}")
+        stats = {
+            'api_keys': 0,
+            'orgs': 0,
+            'total_calls': 0,
+            'recent_usage': []
+        }
+    
+    return render_template('dashboard/index.html', user=user, stats=stats)
 
 @bp.route('/keys')
 @login_required
 def keys():
-    """API keys management"""
-    api_keys = APIKey.query.filter_by(user_id=current_user.id)\
-                          .order_by(APIKey.created_at.desc()).all()
-    return render_template('dashboard/keys.html', api_keys=api_keys)
+    """API Keys management"""
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('auth.login'))
+    
+    current_app.logger.info(f"Keys page accessed by: {user.email}")
+    
+    # Get user's API keys
+    user_keys = APIKey.query.filter_by(user_id=user.id).order_by(APIKey.created_at.desc()).all()
+    
+    return render_template('dashboard/api_keys.html', user=user, api_keys=user_keys)
 
 @bp.route('/keys/create', methods=['POST'])
 @login_required
 def create_key():
-    """Create a new API key"""
-    name = request.form.get('name', '').strip()
-    description = request.form.get('description', '').strip()
+    """Create new API key"""
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('auth.login'))
     
-    if not name:
-        flash('API key name is required.', 'error')
+    key_name = request.form.get('name', '').strip()
+    if not key_name:
+        flash('Key name is required', 'error')
         return redirect(url_for('dashboard.keys'))
     
     try:
-        api_key = APIKey.create_api_key(
-            user_id=current_user.id,
-            name=name,
-            description=description or None
+        # Get default rate configuration
+        rate_config = RateConfiguration.query.filter_by(is_default=True).first()
+        if not rate_config:
+            # Create a basic rate config if none exists
+            rate_config = RateConfiguration(
+                tier_name='default',
+                display_name='Default',
+                calls_per_hour=100,
+                burst_limit=20
+            )
+            db.session.add(rate_config)
+            db.session.flush()
+        
+        # Create API key
+        api_key = APIKey.create_key(
+            user_id=user.id,
+            name=key_name,
+            rate_configuration_id=rate_config.id
         )
         
-        # Show the API key once (it won't be shown again)
-        flash(f'API key created successfully!', 'success')
-        flash(f'Your API key: {api_key._generated_key}', 'api_key')  # Special category for styling
-        flash('Please copy this key now - you won\'t see it again!', 'warning')
+        # Show the full key one time via flash message
+        flash(f'API Key created successfully! Your key: {api_key.get_display_key()}', 'api_key')
+        current_app.logger.info(f"API key created for user {user.email}: {api_key.key_prefix}...")
         
     except Exception as e:
-        flash('Error creating API key. Please try again.', 'error')
-        current_app.logger.error(f'Error creating API key: {e}')
+        current_app.logger.error(f"Error creating API key: {e}")
+        flash('Failed to create API key. Please try again.', 'error')
     
     return redirect(url_for('dashboard.keys'))
 
@@ -76,18 +119,23 @@ def create_key():
 @login_required
 def deactivate_key(key_id):
     """Deactivate an API key"""
-    api_key = APIKey.query.filter_by(id=key_id, user_id=current_user.id).first()
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('auth.login'))
     
+    api_key = APIKey.query.filter_by(id=key_id, user_id=user.id).first()
     if not api_key:
-        flash('API key not found.', 'error')
+        flash('API key not found', 'error')
         return redirect(url_for('dashboard.keys'))
     
     try:
         api_key.deactivate()
-        flash(f'API key "{api_key.name}" has been deactivated.', 'success')
+        flash(f'API key "{api_key.name}" has been deactivated', 'success')
+        current_app.logger.info(f"API key deactivated: {api_key.key_prefix}... by {user.email}")
+        
     except Exception as e:
-        flash('Error deactivating API key.', 'error')
-        current_app.logger.error(f'Error deactivating API key: {e}')
+        current_app.logger.error(f"Error deactivating API key: {e}")
+        flash('Failed to deactivate API key', 'error')
     
     return redirect(url_for('dashboard.keys'))
 
@@ -95,82 +143,111 @@ def deactivate_key(key_id):
 @login_required
 def orgs():
     """Salesforce organizations management"""
-    orgs = SalesforceOrg.get_user_orgs(current_user.id, active_only=False)
-    return render_template('dashboard/orgs.html', orgs=orgs)
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('auth.login'))
+    
+    current_app.logger.info(f"Orgs page accessed by: {user.email}")
+    
+    # Get user's Salesforce orgs
+    user_orgs = SalesforceOrg.query.filter_by(user_id=user.id)\
+        .order_by(SalesforceOrg.created_at.desc())\
+        .all()
+    
+    return render_template('dashboard/salesforce.html', user=user, orgs=user_orgs)
 
 @bp.route('/orgs/create', methods=['POST'])
 @login_required
 def create_org():
-    """Initiate Salesforce org connection via OAuth"""
+    """Initiate Salesforce OAuth flow"""
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('auth.login'))
+    
     org_identifier = request.form.get('org_identifier', '').strip()
-    is_sandbox = request.form.get('is_sandbox') == 'true'
+    is_sandbox = request.form.get('is_sandbox') == 'on'
     
     if not org_identifier:
-        flash('Org identifier is required.', 'error')
+        flash('Organization identifier is required', 'error')
         return redirect(url_for('dashboard.orgs'))
     
-    # Validate org identifier format
-    import re
-    if not re.match(r'^[a-zA-Z0-9_-]+$', org_identifier):
-        flash('Org identifier can only contain letters, numbers, hyphens, and underscores.', 'error')
-        return redirect(url_for('dashboard.orgs'))
+    # Check if org already exists for this user
+    existing_org = SalesforceOrg.query.filter_by(
+        user_id=user.id,
+        org_identifier=org_identifier
+    ).first()
     
-    # Check if org identifier already exists for this user
-    existing_org = SalesforceOrg.get_by_identifier_and_user(org_identifier, current_user.id)
     if existing_org:
-        flash(f'An org with identifier "{org_identifier}" already exists.', 'error')
+        flash(f'Organization "{org_identifier}" already exists', 'error')
         return redirect(url_for('dashboard.orgs'))
     
-    # Redirect to Salesforce OAuth flow
-    return redirect(url_for('auth.salesforce_authorize', 
-                          org_identifier=org_identifier, 
-                          is_sandbox=is_sandbox))
+    # Redirect to Salesforce OAuth
+    oauth_url = url_for('auth.salesforce_authorize', 
+                       org_identifier=org_identifier,
+                       is_sandbox=is_sandbox)
+    
+    current_app.logger.info(f"Starting OAuth for org: {org_identifier}, sandbox: {is_sandbox}")
+    return redirect(oauth_url)
 
 @bp.route('/orgs/<org_id>/deactivate', methods=['POST'])
 @login_required
 def deactivate_org(org_id):
-    """Deactivate/disconnect a Salesforce org"""
-    org = SalesforceOrg.get_by_id_and_user(org_id, current_user.id)
+    """Deactivate a Salesforce org"""
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('auth.login'))
     
+    org = SalesforceOrg.query.filter_by(id=org_id, user_id=user.id).first()
     if not org:
-        flash('Salesforce org not found.', 'error')
+        flash('Organization not found', 'error')
         return redirect(url_for('dashboard.orgs'))
     
     try:
         org.deactivate()
-        flash(f'Salesforce org "{org.org_identifier}" has been disconnected.', 'success')
+        flash(f'Organization "{org.org_identifier}" has been disconnected', 'success')
+        current_app.logger.info(f"Org deactivated: {org.org_identifier} by {user.email}")
+        
     except Exception as e:
-        flash('Error disconnecting Salesforce org.', 'error')
-        current_app.logger.error(f'Error deactivating org: {e}')
+        current_app.logger.error(f"Error deactivating org: {e}")
+        flash('Failed to disconnect organization', 'error')
     
     return redirect(url_for('dashboard.orgs'))
 
 @bp.route('/usage')
 @login_required
 def usage():
-    """Usage and billing information"""
+    """Usage statistics"""
+    user = get_current_user()
+    if not user:
+        return redirect(url_for('auth.login'))
+    
+    current_app.logger.info(f"Usage page accessed by: {user.email}")
+    
     # Get usage statistics
-    total_calls = UsageLog.query.filter_by(user_id=current_user.id).count()
-    successful_calls = UsageLog.query.filter_by(user_id=current_user.id, success=True).count()
+    try:
+        total_calls = UsageLog.query.filter_by(user_id=user.id).count()
+        successful_calls = UsageLog.query.filter_by(user_id=user.id, success=True).count()
+        
+        # Recent usage logs
+        recent_logs = UsageLog.query.filter_by(user_id=user.id)\
+            .order_by(UsageLog.created_at.desc())\
+            .limit(50)\
+            .all()
+        
+        usage_stats = {
+            'total_calls': total_calls,
+            'successful_calls': successful_calls,
+            'success_rate': round((successful_calls / total_calls * 100), 2) if total_calls > 0 else 0,
+            'recent_logs': recent_logs
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting usage stats: {e}")
+        usage_stats = {
+            'total_calls': 0,
+            'successful_calls': 0,
+            'success_rate': 0,
+            'recent_logs': []
+        }
     
-    # Recent usage history
-    recent_usage = UsageLog.query.filter_by(user_id=current_user.id)\
-                                 .order_by(UsageLog.created_at.desc())\
-                                 .limit(50).all()
-    
-    # Usage by month (for chart)
-    from sqlalchemy import func, extract
-    monthly_usage = db.session.query(
-        extract('year', UsageLog.created_at).label('year'),
-        extract('month', UsageLog.created_at).label('month'),
-        func.count(UsageLog.id).label('count')
-    ).filter_by(user_id=current_user.id)\
-     .group_by(extract('year', UsageLog.created_at), extract('month', UsageLog.created_at))\
-     .order_by(extract('year', UsageLog.created_at), extract('month', UsageLog.created_at))\
-     .all()
-    
-    return render_template('dashboard/usage.html',
-                         total_calls=total_calls,
-                         successful_calls=successful_calls,
-                         recent_usage=recent_usage,
-                         monthly_usage=monthly_usage) 
+    return render_template('dashboard/usage.html', user=user, usage=usage_stats) 
