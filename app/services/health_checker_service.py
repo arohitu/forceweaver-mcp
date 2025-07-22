@@ -48,7 +48,7 @@ class RevenueCloudHealthChecker:
     def _safe_query(self, query, check_name, description=""):
         """Safely execute a SOQL query with detailed error handling."""
         try:
-            logger.info(f"=== {check_name} Query Debug ===")
+            logger.info(f"=== {check_name} SOQL Query Debug ===")
             logger.info(f"Description: {description}")
             logger.info(f"Query: {query}")
             
@@ -57,37 +57,104 @@ class RevenueCloudHealthChecker:
                 logger.error("SF client does not have query method")
                 raise Exception("SF client does not have query method")
             
+            # Log detailed client information before query
+            logger.info(f"=== SALESFORCE CLIENT STATE ===")
+            logger.info(f"Base URL: {getattr(self.sf, 'base_url', 'Not Available')}")
+            logger.info(f"Session ID Length: {len(self.sf.session_id) if hasattr(self.sf, 'session_id') and self.sf.session_id else 0}")
+            logger.info(f"Session ID Preview: {self.sf.session_id[:20]}..." if hasattr(self.sf, 'session_id') and self.sf.session_id else "No session ID")
+            logger.info(f"API Version: {getattr(self.sf, 'version', 'Not Available')}")
+            
+            # Construct expected URL for this query
+            if hasattr(self.sf, 'base_url'):
+                encoded_query = query.replace(' ', '+').replace("'", "%27")
+                expected_url = f"{self.sf.base_url}/query/?q={encoded_query}"
+                logger.info(f"Expected Query URL: {expected_url}")
+            
             # Execute the query
+            logger.info(f"=== EXECUTING SOQL QUERY ===")
             start_time = time.time()
             result = self.sf.query(query)
             end_time = time.time()
             
+            logger.info(f"=== SOQL QUERY SUCCESS ===")
             logger.info(f"Query executed successfully in {end_time - start_time:.2f}s")
-            logger.info(f"Total records returned: {result.get('totalSize', 'Unknown')}")
+            logger.info(f"Result type: {type(result)}")
             
-            if result.get('totalSize', 0) > 0:
-                logger.info(f"Sample record keys: {list(result['records'][0].keys()) if result.get('records') else 'No records'}")
+            if result:
+                logger.info(f"Result keys: {list(result.keys()) if hasattr(result, 'keys') else 'No keys method'}")
+                logger.info(f"Total records returned: {result.get('totalSize', 'Unknown')}")
+                logger.info(f"Done: {result.get('done', 'Unknown')}")
+                logger.info(f"NextRecordsUrl: {result.get('nextRecordsUrl', 'None')}")
+                
+                if result.get('totalSize', 0) > 0 and result.get('records'):
+                    sample_record = result['records'][0]
+                    logger.info(f"Sample record keys: {list(sample_record.keys()) if sample_record else 'No sample record'}")
+                    # Log a few key fields without sensitive data
+                    if 'Id' in sample_record:
+                        logger.info(f"Sample record Id: {sample_record['Id']}")
+            else:
+                logger.warning("Query returned None or empty result")
             
             return result
             
         except Exception as e:
-            logger.error(f"=== {check_name} Query Failed ===")
+            logger.error(f"=== {check_name} SOQL Query Failed ===")
+            logger.error(f"Query that failed: {query}")
             logger.error(f"Error type: {type(e).__name__}")
             logger.error(f"Error message: {str(e)}")
             
             # Try to get more detailed error information
-            if hasattr(e, 'response'):
-                logger.error(f"HTTP Status Code: {e.response.status_code if hasattr(e.response, 'status_code') else 'N/A'}")
-                logger.error(f"HTTP Response Text: {e.response.text if hasattr(e.response, 'text') else 'N/A'}")
+            if hasattr(e, 'response') and e.response:
+                logger.error(f"=== HTTP ERROR DETAILS ===")
+                logger.error(f"HTTP Status Code: {e.response.status_code}")
+                logger.error(f"HTTP Response Headers: {dict(e.response.headers)}")
+                logger.error(f"HTTP Response Text: {e.response.text}")
+                logger.error(f"HTTP Request URL: {e.response.url}")
+                logger.error(f"HTTP Request Method: {e.response.request.method if hasattr(e.response, 'request') else 'Unknown'}")
+                
+                if hasattr(e.response, 'request') and e.response.request:
+                    logger.error(f"HTTP Request Headers: {dict(e.response.request.headers)}")
+                    if hasattr(e.response.request, 'body'):
+                        logger.error(f"HTTP Request Body: {e.response.request.body}")
             
             # Try to parse any JSON error response
             try:
                 if hasattr(e, 'response') and hasattr(e.response, 'text'):
                     error_data = json.loads(e.response.text)
+                    logger.error(f"=== PARSED SALESFORCE ERROR ===")
                     logger.error(f"Parsed error response: {json.dumps(error_data, indent=2)}")
-            except:
-                pass
+                    
+                    # Look for specific Salesforce error patterns
+                    if isinstance(error_data, list) and len(error_data) > 0:
+                        first_error = error_data[0]
+                        if isinstance(first_error, dict):
+                            error_code = first_error.get('errorCode', 'Unknown')
+                            error_message = first_error.get('message', 'Unknown')
+                            logger.error(f"Salesforce Error Code: {error_code}")
+                            logger.error(f"Salesforce Error Message: {error_message}")
+                            
+                            # Additional analysis for NOT_FOUND errors
+                            if error_code == 'NOT_FOUND':
+                                logger.error(f"=== NOT_FOUND ERROR ANALYSIS ===")
+                                logger.error(f"This suggests the endpoint or resource doesn't exist")
+                                logger.error(f"Possible causes:")
+                                logger.error(f"  1. Wrong Salesforce org (different org than expected)")
+                                logger.error(f"  2. Object doesn't exist in this org")
+                                logger.error(f"  3. Insufficient permissions")
+                                logger.error(f"  4. Wrong API version")
+                                logger.error(f"  5. Instance URL pointing to wrong org")
+            except json.JSONDecodeError:
+                logger.error("Could not parse error response as JSON")
+            except Exception as parse_error:
+                logger.error(f"Error parsing error response: {parse_error}")
             
+            # Log additional context
+            if hasattr(self, 'sf') and self.sf:
+                logger.error(f"=== CLIENT CONTEXT ===")
+                logger.error(f"SF Base URL: {getattr(self.sf, 'base_url', 'Unknown')}")
+                logger.error(f"SF Version: {getattr(self.sf, 'version', 'Unknown')}")
+                logger.error(f"SF Session ID exists: {bool(getattr(self.sf, 'session_id', None))}")
+                
             raise e
     
     def _safe_query_all(self, query, check_name, description=""):

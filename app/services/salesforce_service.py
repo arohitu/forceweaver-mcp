@@ -44,14 +44,20 @@ def get_salesforce_api_client(connection, api_version=None):
             'refresh_token': decrypted_refresh_token
         }
         
-        logger.info(f"Sending token refresh request to: {token_url}")
+        logger.info(f"=== TOKEN REFRESH REQUEST ===")
+        logger.info(f"POST {token_url}")
+        logger.info(f"Request Data: {dict((k, v if k != 'refresh_token' else f'{v[:10]}...' if v else 'None') for k, v in refresh_data.items())}")
+        
         response = requests.post(token_url, data=refresh_data)
         
-        logger.info(f"Token refresh response status: {response.status_code}")
-        logger.info(f"Response headers: {dict(response.headers)}")
+        logger.info(f"=== TOKEN REFRESH RESPONSE ===")
+        logger.info(f"Status Code: {response.status_code}")
+        logger.info(f"Response Headers: {dict(response.headers)}")
+        logger.info(f"Response Text Length: {len(response.text)} chars")
         
         if response.status_code != 200:
-            logger.error(f"Token refresh failed. Response text: {response.text}")
+            logger.error(f"=== TOKEN REFRESH FAILED ===")
+            logger.error(f"Full Response Text: {response.text}")
             logger.error(f"Request data keys: {list(refresh_data.keys())}")
             logger.error(f"Client ID present: {bool(Config.SALESFORCE_CLIENT_ID)}")
             logger.error(f"Client Secret present: {bool(Config.SALESFORCE_CLIENT_SECRET)}")
@@ -61,14 +67,19 @@ def get_salesforce_api_client(connection, api_version=None):
         new_token_data = response.json()
         new_access_token = new_token_data.get('access_token')
         
+        logger.info(f"=== TOKEN DATA ANALYSIS ===")
         logger.info(f"Token response keys: {list(new_token_data.keys())}")
         logger.info(f"Access token present: {bool(new_access_token)}")
         logger.info(f"Access token length: {len(new_access_token) if new_access_token else 0} chars")
+        logger.info(f"Access token preview: {new_access_token[:20]}..." if new_access_token else "No access token")
         
         if 'instance_url' in new_token_data:
             logger.info(f"Instance URL from token: {new_token_data['instance_url']}")
             if new_token_data['instance_url'] != connection.instance_url:
-                logger.warning(f"Instance URL mismatch! Stored: {connection.instance_url}, Token: {new_token_data['instance_url']}")
+                logger.warning(f"=== INSTANCE URL MISMATCH WARNING ===")
+                logger.warning(f"Stored Instance URL: {connection.instance_url}")
+                logger.warning(f"Token Instance URL: {new_token_data['instance_url']}")
+                logger.warning(f"This could cause API calls to hit wrong org!")
 
         if not new_access_token:
             logger.error(f"No access token in response: {new_token_data}")
@@ -77,7 +88,12 @@ def get_salesforce_api_client(connection, api_version=None):
         logger.info("Successfully obtained new access token")
         
         # Step 2: Instantiate the Salesforce client with the specific API version
-        logger.info(f"Creating Salesforce client with version: {api_version}")
+        logger.info(f"=== SALESFORCE CLIENT INITIALIZATION ===")
+        logger.info(f"Creating Salesforce client with:")
+        logger.info(f"  Instance URL: {connection.instance_url}")
+        logger.info(f"  API Version: {api_version}")
+        logger.info(f"  Session ID Length: {len(new_access_token)}")
+        
         sf = Salesforce(
             instance_url=connection.instance_url,
             session_id=new_access_token,
@@ -92,17 +108,36 @@ def get_salesforce_api_client(connection, api_version=None):
         logger.info(f"SF Version: {sf.version}")
         logger.info(f"SF Session ID length: {len(sf.session_id) if sf.session_id else 0}")
         
-        # Test the client with a simple query
+        # Test the client with a simple query and log the full request/response
         try:
-            logger.info("Testing SF client with simple query...")
-            test_result = sf.query("SELECT Id FROM User LIMIT 1")
-            logger.info(f"✅ SF client test successful - returned {test_result['totalSize']} records")
+            logger.info("=== TESTING SF CLIENT WITH SIMPLE QUERY ===")
+            test_query = "SELECT Id FROM User LIMIT 1"
+            
+            # Log what we're about to call
+            expected_url = f"{sf.base_url}/query/?q={test_query.replace(' ', '+')}"
+            logger.info(f"Expected query URL: {expected_url}")
+            logger.info(f"Query: {test_query}")
+            
+            test_result = sf.query(test_query)
+            
+            logger.info(f"=== SIMPLE QUERY SUCCESS ===")
+            logger.info(f"Query result keys: {list(test_result.keys()) if test_result else 'No result'}")
+            logger.info(f"Total size: {test_result.get('totalSize', 'Unknown')}")
+            
         except Exception as test_error:
-            logger.error(f"❌ SF client test failed: {str(test_error)}")
-            logger.error(f"Test error type: {type(test_error).__name__}")
-            if hasattr(test_error, 'response'):
-                logger.error(f"Test error status: {getattr(test_error.response, 'status_code', 'N/A')}")
-                logger.error(f"Test error response: {getattr(test_error.response, 'text', 'N/A')}")
+            logger.error(f"=== SIMPLE QUERY FAILED ===")
+            logger.error(f"Test query: {test_query}")
+            logger.error(f"Error type: {type(test_error).__name__}")
+            logger.error(f"Error message: {str(test_error)}")
+            
+            if hasattr(test_error, 'response') and test_error.response:
+                logger.error(f"HTTP Status Code: {test_error.response.status_code}")
+                logger.error(f"HTTP Response Headers: {dict(test_error.response.headers)}")
+                logger.error(f"HTTP Response Text: {test_error.response.text}")
+                logger.error(f"HTTP Request URL: {test_error.response.url}")
+            
+            if hasattr(test_error, 'args'):
+                logger.error(f"Error args: {test_error.args}")
         
         return sf
     except Exception as e:
