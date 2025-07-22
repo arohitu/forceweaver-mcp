@@ -69,12 +69,21 @@ def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
-            auth_header = request.headers.get('Authorization')
-            if not auth_header or not auth_header.startswith('Bearer '):
-                logger.warning(f"Invalid authorization header from {request.remote_addr}")
-                abort(401, 'Authorization header is missing or invalid.')
-
-            api_key_str = auth_header.split(' ')[1]
+            api_key_str = None
+            
+            # Check for X-API-Key header first (preferred)
+            api_key_str = request.headers.get('X-API-Key')
+            
+            # If not found, check for Authorization Bearer header (legacy)
+            if not api_key_str:
+                auth_header = request.headers.get('Authorization')
+                if auth_header and auth_header.startswith('Bearer '):
+                    api_key_str = auth_header.split(' ')[1]
+            
+            # If neither header is found, return error
+            if not api_key_str:
+                logger.warning(f"Missing API key from {request.remote_addr}")
+                abort(401, 'API key is required. Use X-API-Key header or Authorization: Bearer token.')
             
             # Hash the provided API key
             hashed_key = hash_api_key(api_key_str)
@@ -86,8 +95,12 @@ def require_api_key(f):
             api_key = APIKey.query.filter_by(hashed_key=hashed_key).first()
             
             if not api_key:
-                logger.warning(f"Invalid API key attempt from {request.remote_addr}")
+                logger.warning(f"Invalid API key attempt from {request.remote_addr}: {hashed_key[:10]}...")
                 abort(401, 'Invalid API key.')
+            
+            if not api_key.is_active:
+                logger.warning(f"Inactive API key attempt from {request.remote_addr}: {hashed_key[:10]}...")
+                abort(401, 'API key is not active.')
             
             # Update last used timestamp
             from datetime import datetime
