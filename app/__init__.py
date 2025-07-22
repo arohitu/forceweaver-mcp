@@ -127,23 +127,38 @@ def create_app(config_class=Config):
         # API domain - return API info with environment context
         environment_name = Config.get_environment_name()
         app_name = Config.get_app_name()
-        app.logger.info(f"API response - Environment: {environment_name}, App: {app_name}")
         
         return {
             "service": app_name,
             "environment": environment_name,
             "version": "1.0.0",
             "description": "Monetized Revenue Cloud Health Checker API for AI agents",
-            "endpoints": {
-                "auth": "/api/auth/salesforce/initiate?email=<your-email>",
-                "health_check": "/api/mcp/health-check",
-                "tools": "/api/mcp/tools",
-                "status": "/api/mcp/status"
+            "protocol": {
+                "name": "Model Context Protocol",
+                "version": "2025-03-26"
             },
+            "capabilities": {
+                "tools": True,
+                "authentication": "Bearer token (API key)"
+            },
+            "endpoints": {
+                "tools": "/api/mcp/tools",
+                "call_tool": "/api/mcp/call-tool", 
+                "status": "/api/mcp/status",
+                "auth": "/api/auth/salesforce/initiate?email=<your-email>",
+                "legacy_health_check": "/api/mcp/health-check"
+            },
+            "tools": [
+                {
+                    "name": "revenue_cloud_health_check",
+                    "description": "Comprehensive Salesforce Revenue Cloud configuration analysis"
+                }
+            ],
             "documentation": {
                 "auth_flow": "1. Navigate to /api/auth/salesforce/initiate?email=<your-email> to start OAuth flow",
-                "api_usage": "Use the returned API key as 'Bearer <api_key>' in Authorization header",
-                "mcp_compliance": "This API follows MCP (Model Context Protocol) standards"
+                "api_usage": "Use the returned API key as 'Authorization: Bearer <api_key>' header",
+                "mcp_compliance": "This API follows MCP (Model Context Protocol) standards for AI agent integration",
+                "tool_invocation": "POST /api/mcp/call-tool with JSON body: {'name': 'tool_name', 'arguments': {...}}"
             }
         }
     
