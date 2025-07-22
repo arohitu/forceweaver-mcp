@@ -2,7 +2,7 @@
 ForceWeaver MCP Server - Flask Application Factory
 """
 import os
-from flask import Flask
+from flask import Flask, current_app
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
@@ -61,12 +61,17 @@ def create_app():
     from app.web.dashboard_routes import bp as dashboard_bp
     app.register_blueprint(dashboard_bp)
     
-    # API routes (JSON responses)
-    app.register_blueprint(auth_api.bp, url_prefix='/api/v1.0/auth')
-    app.register_blueprint(keys_api.bp, url_prefix='/api/v1.0/keys')
-    app.register_blueprint(orgs_api.bp, url_prefix='/api/v1.0/orgs')
-    app.register_blueprint(usage_api.bp, url_prefix='/api/v1.0/usage')
-    app.register_blueprint(internal_api.bp, url_prefix='/api/v1.0/internal')
+    # API routes (JSON responses) - if they exist
+    try:
+        from app.api.v1 import auth_api, keys_api, orgs_api, usage_api, internal_api
+        app.register_blueprint(auth_api.bp, url_prefix='/api/v1.0/auth')
+        app.register_blueprint(keys_api.bp, url_prefix='/api/v1.0/keys')
+        app.register_blueprint(orgs_api.bp, url_prefix='/api/v1.0/orgs')
+        app.register_blueprint(usage_api.bp, url_prefix='/api/v1.0/usage')
+        app.register_blueprint(internal_api.bp, url_prefix='/api/v1.0/internal')
+    except ImportError:
+        # API modules not yet implemented
+        current_app.logger.info("API modules not found, skipping API blueprint registration")
     
     # User loader for Flask-Login
     @login_manager.user_loader
