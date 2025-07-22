@@ -144,13 +144,20 @@ class SalesforceConnection(db.Model):
         if self.preferred_api_version:
             return self.preferred_api_version
         
-        # If no preference set, use the latest available version
+        # If no preference set, use a known working version instead of latest
+        # Based on diagnostics, v58.0-v61.0 are proven to work well
         versions = self.available_versions_list
         if versions:
-            return versions[0]  # Assuming versions are sorted newest first
+            # Use v58.0 if available (proven stable), otherwise v59.0, v60.0, etc.
+            working_versions = ["v58.0", "v59.0", "v60.0", "v61.0"]
+            for preferred_version in working_versions:
+                if preferred_version in versions:
+                    return preferred_version
+            # If none of the preferred versions are available, use the latest
+            return versions[0]
         
-        # Fallback to a more recent default version
-        return "v61.0"  # Summer '24 - more recent than v52.0
+        # Fallback to a known stable version
+        return "v58.0"  # Summer '23 - proven to work well
 
 
 class HealthCheckHistory(db.Model):
