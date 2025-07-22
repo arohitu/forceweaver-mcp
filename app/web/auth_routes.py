@@ -140,7 +140,7 @@ def simple_login():
                 
                 next_page = request.args.get('next')
                 if not next_page or not next_page.startswith('/'):
-                    next_page = '/simple-dashboard'
+                    next_page = '/api/auth/simple-dashboard'  # Fixed path
                 current_app.logger.info(f"Simple login - Redirecting to: {next_page}")
                 return redirect(next_page)
             else:
