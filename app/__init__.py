@@ -2,6 +2,7 @@
 ForceWeaver MCP Server - Flask Application Factory
 """
 import os
+import logging
 from flask import Flask, request, current_app
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
