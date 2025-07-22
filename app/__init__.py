@@ -65,10 +65,20 @@ def create_app():
     app.config['FLASK_ENV'] = os.getenv('FLASK_ENV', 'production')
 
     # **Standard Flask Session Configuration**
-    # Use Flask's default session with proper cookie settings
-    app.config['SESSION_COOKIE_SECURE'] = False  # Allow over HTTP for debugging
-    app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+    # Configure cookies based on environment
+    is_production = os.getenv('FLASK_ENV') == 'production' or 'herokuapp.com' in os.getenv('SERVER_NAME', '')
+    
+    if is_production:
+        # Production HTTPS settings
+        app.config['SESSION_COOKIE_SECURE'] = True   # Require HTTPS for cookies
+        app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
+        app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+    else:
+        # Development HTTP settings
+        app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP for development
+        app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
+        app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+    
     app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
 
     # Database configuration
