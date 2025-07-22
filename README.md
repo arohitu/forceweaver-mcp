@@ -1,324 +1,234 @@
-# ForceWeaver MCP API
+# ForceWeaver MCP Server
 
-A standalone, monetized API service that exposes the RevenueCloudHealthChecker tool to AI agents via secure, MCP-compliant endpoints. This service provides comprehensive health checks for Salesforce Revenue Cloud configurations through a dual-authentication system.
+A **Model Context Protocol (MCP) compliant server** that provides AI agents with comprehensive Salesforce Revenue Cloud health checking capabilities. This server follows the official MCP v2025-03-26 specification for maximum compatibility with MCP clients like Claude Desktop, Continue.dev, and other AI development tools.
 
-## Features
+## 🎯 What is MCP?
 
-- **Dual Authentication System**: API keys for customers + one-time Salesforce OAuth 2.0 flow
-- **MCP Compliance**: Follows Model Context Protocol standards for AI agent integration
-- **Comprehensive Health Checks**: Analyzes 10+ aspects of Revenue Cloud configuration
-- **Secure Token Management**: Encrypted storage of Salesforce refresh tokens
-- **Production Ready**: Docker support, proper logging, error handling
-- **Scalable Architecture**: Built for cloud deployment (Heroku, DigitalOcean, GCP, AWS)
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io) is an open standard that enables AI applications to securely access external data sources and tools. Our MCP server exposes Salesforce Revenue Cloud analysis capabilities through standardized JSON-RPC 2.0 messaging over STDIO transport.
 
-## Quick Start
+## 🛠️ Available Tools
 
-### 1. Environment Setup
+### `revenue_cloud_health_check`
 
-Copy the environment configuration:
+Performs comprehensive analysis of Salesforce Revenue Cloud configurations, including:
 
-```bash
-# Copy environment template
-cp .env.example .env
+- **Basic Organization Info**: Validates org settings and basic connectivity
+- **Sharing Model Analysis**: Checks Organization-Wide Default (OWD) sharing settings
+- **Bundle Configuration**: Analyzes product bundles and pricing configurations
+- **Attribute Integrity**: Validates picklist fields and data integrity
 
-# Edit with your values
-vim .env
-```
+**Parameters:**
+- `check_types` (optional): Array of specific check types to run
+  - `basic_org_info`: Organization details and connectivity
+  - `sharing_model`: Sharing rules and OWD settings
+  - `bundle_analysis`: Product bundle configuration
+  - `attribute_integrity`: Picklist validation and data integrity
+- `api_version` (optional): Salesforce API version to use (e.g., "v64.0")
 
-Required environment variables:
-```bash
-SECRET_KEY=your-secret-key-here
-DATABASE_URL=postgresql://username:password@localhost/forceweaver_mcp
-SALESFORCE_CLIENT_ID=your-salesforce-client-id
-SALESFORCE_CLIENT_SECRET=your-salesforce-client-secret
-SALESFORCE_REDIRECT_URI=https://your-domain.com/api/auth/salesforce/callback
-ENCRYPTION_KEY=your-fernet-encryption-key-here
-```
+## 🚀 Quick Start
 
-### 2. Database Setup
+### Prerequisites
+
+1. **Python 3.11+** installed
+2. **Salesforce Connected App** configured for OAuth
+3. **Valid Salesforce credentials** (access token, refresh token, org details)
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/your-repo/forceweaver-mcp.git
+cd forceweaver-mcp
+
 # Install dependencies
 pip install -r requirements.txt
 
-# Initialize database
-python init_db.py
+# Copy and configure environment
+cp env.template .env
+# Edit .env with your Salesforce credentials
 ```
 
-### 3. Run the Application
+### Configuration
 
-**Development:**
+Set the following environment variables in your `.env` file:
+
 ```bash
-python run.py
+# Required: Salesforce Connection Details
+SALESFORCE_INSTANCE_URL=https://your-org.my.salesforce.com
+SALESFORCE_ACCESS_TOKEN=your_salesforce_access_token
+SALESFORCE_REFRESH_TOKEN=your_salesforce_refresh_token
+SALESFORCE_ORG_ID=00D000000000000
+
+# Required: Salesforce OAuth Application
+SALESFORCE_CLIENT_ID=your_connected_app_client_id
+SALESFORCE_CLIENT_SECRET=your_connected_app_client_secret
+
+# Optional: API Version and Logging
+SALESFORCE_API_VERSION=v64.0
+LOG_LEVEL=INFO
 ```
 
-**Production (Docker):**
+### Running the MCP Server
+
 ```bash
-docker build -t forceweaver-mcp .
-docker run -p 8080:8080 --env-file .env forceweaver-mcp
+# Start the MCP server
+python server.py
 ```
 
-## API Endpoints
+The server will start and listen on STDIN/STDOUT for JSON-RPC 2.0 messages according to the MCP specification.
 
-### Authentication Flow
+## 🔧 MCP Client Configuration
 
-#### 1. Initiate Salesforce OAuth
-```
-GET /api/auth/salesforce/initiate?email=<customer-email>
-```
+### Claude Desktop
 
-Redirects to Salesforce authorization page.
+Add to your `claude_desktop_config.json`:
 
-#### 2. OAuth Callback (Automatic)
-```
-GET /api/auth/salesforce/callback
-```
-
-Handles Salesforce OAuth callback and returns:
 ```json
 {
-  "message": "Salesforce connection established successfully",
-  "customer_id": 123,
-  "salesforce_org_id": "00D...",
-  "instance_url": "https://yourorg.salesforce.com",
-  "api_key": "your-api-key-here",
-  "note": "Please save this API key securely. It will not be shown again."
-}
-```
-
-#### 3. Check Connection Status
-```
-GET /api/auth/customer/status?email=<customer-email>
-```
-
-Returns connection status for a customer.
-
-### MCP Endpoints
-
-All MCP endpoints require `Authorization: Bearer <api_key>` header.
-
-#### Health Check
-```
-POST /api/mcp/health-check
-```
-
-Performs comprehensive Revenue Cloud health check:
-```json
-{
-  "success": true,
-  "customer_id": 123,
-  "salesforce_org_id": "00D...",
-  "health_check_results": {
-    "timestamp": "2024-01-20T10:30:00Z",
-    "checks": {
-      "billing_rules": { "status": "ok", "message": "Found 5 active billing rules" },
-      "cpq_configuration": { "status": "warning", "message": "Legacy CPQ settings detected" },
-      "price_books": { "status": "ok", "message": "Found 3 active price books" },
-      "product_catalog": { "status": "ok", "message": "Found 127 active products" },
-      "quote_templates": { "status": "ok", "message": "Found 2 quote templates" },
-      "approval_processes": { "status": "ok", "message": "Approval processes check completed" },
-      "revenue_schedules": { "status": "ok", "message": "Found 45 revenue schedules" },
-      "contracts": { "status": "ok", "message": "Found 23 active contracts" },
-      "subscriptions": { "status": "ok", "message": "Found 89 subscriptions" },
-      "billing_setup": { "status": "ok", "message": "Found 1 active billing configuration" }
-    },
-    "overall_health": {
-      "score": 85.5,
-      "grade": "B",
-      "summary": {
-        "total_checks": 10,
-        "ok": 8,
-        "warnings": 1,
-        "errors": 1
-      }
+  "mcpServers": {
+    "forceweaver": {
+      "command": "python",
+      "args": ["server.py"],
+      "cwd": "/path/to/forceweaver-mcp"
     }
   }
 }
 ```
 
-#### Get Available Tools (MCP)
-```
-GET /api/mcp/tools
-```
+### Continue.dev
 
-Returns MCP-compliant tool definitions:
+Add to your `config.json`:
+
 ```json
 {
-  "tools": [
+  "mcpServers": [
     {
-      "name": "revenue_cloud_health_check",
-      "description": "Perform a comprehensive health check on Salesforce Revenue Cloud configuration",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "check_types": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "Specific types of checks to perform (optional, defaults to all)"
-          }
-        }
-      }
+      "name": "forceweaver",
+      "command": "python",
+      "args": ["server.py"],
+      "cwd": "/path/to/forceweaver-mcp"
     }
-  ],
-  "capabilities": {
-    "tools": {
-      "listChanged": false
-    }
-  }
+  ]
 }
 ```
 
-#### Service Status
+## 📡 MCP Protocol Details
+
+This server implements the following MCP capabilities:
+
+### Server Features
+- ✅ **Tools**: Exposes `revenue_cloud_health_check` tool
+- ✅ **Tool Calling**: Full JSON-RPC 2.0 tool execution
+- ✅ **Error Handling**: Structured error responses
+- ✅ **Logging**: Proper stderr logging (stdout reserved for protocol)
+
+### Protocol Methods
+- `initialize`: Server initialization and capability negotiation
+- `tools/list`: Lists available tools with schemas
+- `tools/call`: Executes tool with parameters
+- `ping`: Health check and connectivity test
+
+## 🧪 Testing
+
+### Manual Testing
+
+```bash
+# Test basic connectivity
+echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | python server.py
+
+# List available tools
+echo '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | python server.py
+
+# Call health check tool
+echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"revenue_cloud_health_check","arguments":{"check_types":["basic_org_info"]}}}' | python server.py
 ```
-GET /api/mcp/status
+
+### With MCP Client
+
+```bash
+# Using the MCP CLI tool (if available)
+mcp call forceweaver revenue_cloud_health_check '{"check_types": ["basic_org_info", "sharing_model"]}'
 ```
 
-Returns service status for the authenticated customer.
+## 🏗️ Architecture
 
-## Health Check Categories
+```
+┌─────────────────┐    JSON-RPC 2.0     ┌──────────────────┐
+│   MCP Client    │ ◄──── STDIO ────► │  MCP Server      │
+│  (Claude, etc.) │                    │  (ForceWeaver)   │
+└─────────────────┘                    └──────────────────┘
+                                               │
+                                               │ simple-salesforce
+                                               ▼
+                                       ┌──────────────────┐
+                                       │  Salesforce API  │
+                                       │   (REST/SOQL)    │
+                                       └──────────────────┘
+```
 
-The API performs comprehensive checks across 10 categories:
+### Components
 
-1. **Billing Rules** - Active billing rules and expiration dates
-2. **CPQ Configuration** - Required settings and legacy configuration detection
-3. **Price Books** - Active price books and standard price book validation
-4. **Product Catalog** - Active products and product family assignments
-5. **Quote Templates** - Template configuration and default template validation
-6. **Approval Processes** - Approval process configuration (requires Metadata API)
-7. **Revenue Schedules** - Revenue schedule analysis
-8. **Contracts** - Contract status and configuration
-9. **Subscriptions** - Subscription configuration (CPQ-dependent)
-10. **Billing Setup** - Billing configuration and active settings
+- **`server.py`**: Main MCP server implementation using FastMCP
+- **`services/salesforce_service.py`**: Salesforce API client wrapper
+- **`services/health_checker_service.py`**: Revenue Cloud analysis logic
+- **STDIO Transport**: JSON-RPC 2.0 messages over standard input/output
 
-## Security Features
+## 🛡️ Security Considerations
 
-- **Encrypted Token Storage**: Salesforce refresh tokens are encrypted using Fernet encryption
-- **Hashed API Keys**: Customer API keys are hashed before storage
-- **OAuth 2.0 Flow**: Secure one-time authorization without handling customer credentials
-- **Request Logging**: Comprehensive logging for audit trails
-- **Error Handling**: Secure error responses that don't leak sensitive information
+- **Environment-based Authentication**: No API keys stored in code
+- **Token Management**: Secure handling of Salesforce OAuth tokens
+- **Logging**: Sensitive data logged only to stderr, never stdout
+- **Input Validation**: All tool parameters validated against JSON schemas
 
-## Deployment Options
+## 🚢 Deployment
 
 ### Heroku
+
 ```bash
-# Create Heroku app
+# Deploy to Heroku
 heroku create your-app-name
-
-# Add PostgreSQL
-heroku addons:create heroku-postgresql:hobby-dev
-
-# Set environment variables
-heroku config:set SECRET_KEY=your-secret-key
-heroku config:set SALESFORCE_CLIENT_ID=your-client-id
-# ... etc
-
-# Deploy
+heroku config:set SALESFORCE_INSTANCE_URL=https://your-org.salesforce.com
+heroku config:set SALESFORCE_ACCESS_TOKEN=your_token
+# ... set other environment variables
 git push heroku main
 ```
 
-### DigitalOcean App Platform
-```yaml
-# app.yaml
-name: forceweaver-mcp
-services:
-- name: api
-  source_dir: /
-  github:
-    repo: your-username/forceweaver-mcp
-    branch: main
-  run_command: gunicorn -b 0.0.0.0:8080 app:create_app()
-  environment_slug: python
-  instance_count: 1
-  instance_size_slug: basic-xxs
-  envs:
-  - key: SECRET_KEY
-    value: your-secret-key
-  - key: DATABASE_URL
-    value: ${db.DATABASE_URL}
-databases:
-- name: db
-  engine: PG
-  version: "13"
-```
+### Docker
 
-### Google Cloud Run
 ```bash
-# Build and push to Container Registry
-gcloud builds submit --tag gcr.io/your-project/forceweaver-mcp
+# Build image
+docker build -t forceweaver-mcp .
 
-# Deploy to Cloud Run
-gcloud run deploy forceweaver-mcp \
-  --image gcr.io/your-project/forceweaver-mcp \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated
+# Run with environment file
+docker run --env-file .env forceweaver-mcp
 ```
-
-## Development
 
 ### Local Development
+
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment
-cp .env.example .env
-# Edit .env with your values
-
-# Initialize database
-python init_db.py
-
-# Run development server
-python run.py
+# Run with debug logging
+LOG_LEVEL=DEBUG python server.py
 ```
 
-### Testing
-```bash
-# Test OAuth flow
-curl "http://localhost:5000/api/auth/salesforce/initiate?email=test@example.com"
+## 📚 MCP Resources
 
-# Test health check (requires API key)
-curl -X POST "http://localhost:5000/api/mcp/health-check" \
-  -H "Authorization: Bearer your-api-key"
-```
+- [Model Context Protocol Specification](https://spec.modelcontextprotocol.io)
+- [MCP Python SDK Documentation](https://modelcontextprotocol.io/python)
+- [MCP Client Integration Guides](https://modelcontextprotocol.io/clients)
+- [FastMCP Framework](https://github.com/modelcontextprotocol/python-sdk)
 
-## Architecture
+## 🤝 Contributing
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   AI Agent      │    │  Customer       │    │   Salesforce    │
-│                 │    │                 │    │                 │
-└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
-          │                      │                      │
-          │ API Key Auth         │ OAuth 2.0            │
-          │                      │                      │
-          ▼                      ▼                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                ForceWeaver MCP API                              │
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
-│  │   Auth      │  │    MCP      │  │     Health Checker      │ │
-│  │  Routes     │  │  Routes     │  │       Service           │ │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
-│  │  Security   │  │   Error     │  │      Logging            │ │
-│  │   Core      │  │ Handling    │  │    Configuration        │ │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │
-                          ▼
-                ┌─────────────────┐
-                │   PostgreSQL    │
-                │    Database     │
-                └─────────────────┘
-```
+1. Fork the repository
+2. Create a feature branch
+3. Ensure MCP compliance with `mcp validate`
+4. Add tests for new functionality
+5. Submit a pull request
 
-## License
+## 📄 License
 
-This project is proprietary software. All rights reserved.
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Support
+---
 
-For support, please contact: support@forceweaver.com
+**Built with ❤️ for the MCP ecosystem**
