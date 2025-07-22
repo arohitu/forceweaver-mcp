@@ -182,53 +182,40 @@ def perform_health_check():
 @mcp_bp.route('/tools', methods=['GET'])
 def get_available_tools():
     """Return MCP-compliant tool definitions."""
-    try:
-        tools = [
-            {
-                "name": "revenue_cloud_health_check",
-                "description": "Perform a comprehensive health check on Salesforce Revenue Cloud configuration. Analyzes org settings, sharing models, bundle configurations, and data integrity.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "check_types": {
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                                "enum": ["basic_org_info", "sharing_model", "bundle_analysis", "attribute_integrity"]
-                            },
-                            "description": "Specific types of checks to perform. Options: basic_org_info (organization details), sharing_model (OWD settings), bundle_analysis (product bundle config), attribute_integrity (picklist validation). If not specified, all checks will be performed."
-                        },
-                        "api_version": {
+    tools = [
+        {
+            "name": "revenue_cloud_health_check",
+            "description": "Perform a comprehensive health check on Salesforce Revenue Cloud configuration. Analyzes org settings, sharing models, bundle configurations, and data integrity.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "check_types": {
+                        "type": "array",
+                        "items": {
                             "type": "string",
-                            "pattern": "^v\\d+\\.0$",
-                            "description": "Salesforce API version to use (e.g., 'v64.0'). If not specified, uses the customer's preferred version or the latest available."
-                        }
+                            "enum": ["basic_org_info", "sharing_model", "bundle_analysis", "attribute_integrity"]
+                        },
+                        "description": "Specific types of checks to perform. Options: basic_org_info (organization details), sharing_model (OWD settings), bundle_analysis (product bundle config), attribute_integrity (picklist validation). If not specified, all checks will be performed."
                     },
-                    "additionalProperties": False
-                }
-            }
-        ]
-        
-        response_data = {
-            "tools": tools,
-            "capabilities": {
-                "tools": {
-                    "listChanged": False
-                }
+                    "api_version": {
+                        "type": "string",
+                        "pattern": "^v\\d+\\.0$",
+                        "description": "Salesforce API version to use (e.g., 'v64.0'). If not specified, uses the customer's preferred version or the latest available."
+                    }
+                },
+                "additionalProperties": False
             }
         }
-        
-        return jsonify(response_data)
-        
-    except Exception as e:
-        logging.getLogger(__name__).error(f"Tools endpoint error: {str(e)}", exc_info=True)
-        return jsonify({
-            "error": {
-                "message": f"Tools endpoint failed: {str(e)}",
-                "status_code": 500,
-                "type": "ToolsEndpointError"
+    ]
+    
+    return jsonify({
+        "tools": tools,
+        "capabilities": {
+            "tools": {
+                "listChanged": False
             }
-        }), 500
+        }
+    })
 
 @mcp_bp.route('/status', methods=['GET'])
 @require_api_key
