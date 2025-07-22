@@ -99,7 +99,6 @@ def perform_health_check():
         
         if check_types:
             # Run specific checks only
-            results = []
             for check_type in check_types:
                 if check_type == 'basic_org_info':
                     checker.run_basic_org_info_check()
@@ -109,20 +108,48 @@ def perform_health_check():
                     checker.run_optimized_bundle_checks()
                 elif check_type == 'attribute_integrity':
                     checker.run_attribute_picklist_integrity_check()
-            results = checker.results
+            
+            # Get the results summary after running specific checks
+            results = checker._calculate_health_score()
         else:
             # Run all checks (default behavior)
             results = checker.run_all_checks()
+
+        # Format the response for MCP compliance
+        # results is a dictionary with 'checks' and 'overall_health' keys
+        checks_data = results.get('checks', {})
+        overall_health = results.get('overall_health', {})
+        
+        # Build status summary text
+        status_lines = []
+        status_lines.append(f"✅ Revenue Cloud Health Check Completed")
+        status_lines.append(f"")
+        status_lines.append(f"📊 Overall Health Score: {overall_health.get('score', 0)}% (Grade: {overall_health.get('grade', 'F')})")
+        status_lines.append(f"")
+        
+        summary = overall_health.get('summary', {})
+        status_lines.append(f"📋 Summary:")
+        status_lines.append(f"   • Total Checks: {summary.get('total_checks', 0)}")
+        status_lines.append(f"   • Passed: {summary.get('ok', 0)}")
+        status_lines.append(f"   • Warnings: {summary.get('warnings', 0)}")
+        status_lines.append(f"   • Errors: {summary.get('errors', 0)}")
+        status_lines.append(f"")
+        
+        # Add individual check results
+        status_lines.append("🔍 Individual Check Results:")
+        for check_name, check_data in checks_data.items():
+            status_icon = {"ok": "✅", "warning": "⚠️", "error": "❌"}.get(check_data.get('status'), "❓")
+            check_title = check_name.replace('_', ' ').title()
+            status_lines.append(f"   {status_icon} {check_title}: {check_data.get('status', 'unknown').upper()}")
+            if check_data.get('message'):
+                status_lines.append(f"      └─ {check_data['message']}")
 
         # Return MCP-compliant response
         return jsonify({
             "content": [
                 {
                     "type": "text",
-                    "text": f"✅ Revenue Cloud Health Check Completed\n\nExecuted {len(results)} health checks on Salesforce org {connection.salesforce_org_id} using API version {effective_api_version}.\n\n" +
-                           "\n".join([f"• {result.get('check', 'Unknown')}: {result.get('status', 'unknown').upper()}" + 
-                                    (f" - {result.get('message', '')}" if result.get('message') else "") 
-                                    for result in results])
+                    "text": "\n".join(status_lines)
                 }
             ],
             "isError": False,
@@ -131,7 +158,9 @@ def perform_health_check():
                 "salesforce_org_id": connection.salesforce_org_id,
                 "api_version_used": effective_api_version,
                 "checks_requested": check_types if check_types else ["all"],
-                "total_checks": len(results)
+                "total_checks": summary.get('total_checks', 0),
+                "health_score": overall_health.get('score', 0),
+                "health_grade": overall_health.get('grade', 'F')
             }
         })
     
