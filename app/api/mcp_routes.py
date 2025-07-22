@@ -103,7 +103,7 @@ def perform_health_check():
                 if check_type == 'basic_org_info':
                     checker.run_basic_org_info_check()
                 elif check_type == 'sharing_model':
-                    checker.run_sharing_model_check()
+                    checker.run_owd_sharing_check()
                 elif check_type == 'bundle_analysis':
                     checker.run_optimized_bundle_checks()
                 elif check_type == 'attribute_integrity':
