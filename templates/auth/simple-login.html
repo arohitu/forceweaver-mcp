@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Login Test - ForceWeaver MCP</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 40px; }
+        .form-group { margin: 20px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="email"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
+        button:hover { background: #0056b3; }
+        .alert { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .test-info { background: #e7f3ff; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Simple Login Test</h1>
+    
+    <div class="test-info">
+        <h3>Testing Basic Session Authentication</h3>
+        <p>This bypasses Flask-Login to test if basic Flask sessions work on Heroku.</p>
+        <p><strong>Test Credentials:</strong></p>
+        <p>Email: <code>test@forceweaver.com</code></p>
+        <p>Password: <code>test123</code></p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+
+        <button type="submit">Test Simple Login</button>
+    </form>
+
+    <p style="text-align: center; margin-top: 30px;">
+        <a href="/api/auth/login">← Back to Flask-Login</a>
+    </p>
+</body>
+</html> 

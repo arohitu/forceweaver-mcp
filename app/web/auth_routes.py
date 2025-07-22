@@ -106,6 +106,119 @@ def profile():
     """User profile page"""
     return render_template('auth/profile.html')
 
+@bp.route('/simple-login', methods=['GET', 'POST'])
+def simple_login():
+    """Simple session-based login without Flask-Login"""
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        current_app.logger.info(f"Simple login attempt for email: {email}")
+        
+        if not email or not password:
+            flash('Email and password are required.', 'error')
+            return render_template('auth/simple-login.html')
+        
+        user = User.query.filter_by(email=email).first()
+        current_app.logger.info(f"Simple login - User found: {bool(user)}")
+        
+        if user and user.check_password(password):
+            current_app.logger.info(f"Simple login - Password check passed for user: {user.email}")
+            if user.is_active:
+                current_app.logger.info("Simple login - User is active, setting session")
+                
+                # Use basic Flask session instead of Flask-Login
+                current_app.logger.info(f"Simple login - Before setting session: {dict(session)}")
+                session['user_id'] = str(user.id)
+                session['user_email'] = user.email  
+                session['authenticated'] = True
+                session.permanent = True  # Make session permanent
+                current_app.logger.info(f"Simple login - After setting session: {dict(session)}")
+                
+                # Force session save
+                session.modified = True
+                
+                next_page = request.args.get('next')
+                if not next_page or not next_page.startswith('/'):
+                    next_page = '/simple-dashboard'
+                current_app.logger.info(f"Simple login - Redirecting to: {next_page}")
+                return redirect(next_page)
+            else:
+                current_app.logger.warning(f"Simple login - User {user.email} is not active")
+                flash('Your account has been deactivated. Please contact support.', 'error')
+        else:
+            current_app.logger.warning(f"Simple login - Authentication failed for email: {email}")
+            flash('Invalid email or password.', 'error')
+    
+    return render_template('auth/simple-login.html')
+
+@bp.route('/simple-dashboard')
+def simple_dashboard():
+    """Simple dashboard with basic session authentication"""
+    current_app.logger.info(f"Simple dashboard - session received: {dict(session)}")
+    current_app.logger.info(f"Simple dashboard - authenticated: {session.get('authenticated', False)}")
+    current_app.logger.info(f"Simple dashboard - user_id: {session.get('user_id', 'None')}")
+    current_app.logger.info(f"Simple dashboard - user_email: {session.get('user_email', 'None')}")
+    
+    # Check if user is authenticated via session
+    if not session.get('authenticated') or not session.get('user_id'):
+        current_app.logger.warning("Simple dashboard - User not authenticated, redirecting to login")
+        return redirect(url_for('auth.simple_login', next=request.url))
+    
+    user_id = session.get('user_id')
+    user = User.query.get(user_id)
+    
+    if not user or not user.is_active:
+        current_app.logger.warning(f"Simple dashboard - User {user_id} not found or inactive")
+        session.clear()
+        return redirect(url_for('auth.simple_login'))
+    
+    current_app.logger.info(f"Simple dashboard - Successfully authenticated user: {user.email}")
+    
+    # Get basic stats
+    from app.models.api_key import APIKey
+    from app.models.salesforce_org import SalesforceOrg
+    from app.models.usage_log import UsageLog
+    
+    api_keys_count = APIKey.query.filter_by(user_id=user.id, is_active=True).count()
+    orgs_count = SalesforceOrg.query.filter_by(user_id=user.id, is_active=True).count()
+    usage_count = UsageLog.query.filter_by(user_id=user.id).count()
+    
+    return f"""
+    <html>
+    <head><title>Simple Dashboard - SUCCESS!</title></head>
+    <body style="font-family: Arial; padding: 40px;">
+        <h1>🎉 Authentication SUCCESS!</h1>
+        <div style="background: #d4edda; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h2>User Information:</h2>
+            <p><strong>Email:</strong> {user.email}</p>
+            <p><strong>Name:</strong> {user.name}</p>
+            <p><strong>User ID:</strong> {user.id}</p>
+            <p><strong>Is Admin:</strong> {user.is_admin}</p>
+        </div>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h2>Quick Stats:</h2>
+            <p><strong>API Keys:</strong> {api_keys_count}</p>
+            <p><strong>Salesforce Orgs:</strong> {orgs_count}</p>
+            <p><strong>API Calls:</strong> {usage_count}</p>
+        </div>
+        <div style="background: #fff3cd; padding: 20px; border-radius: 5px; margin: 20px 0;">
+            <h2>Session Data:</h2>
+            <pre>{dict(session)}</pre>
+        </div>
+        <p><a href="/api/auth/simple-logout">Logout</a> | <a href="/dashboard/">Try Flask-Login Dashboard</a></p>
+    </body>
+    </html>
+    """
+
+@bp.route('/simple-logout')
+def simple_logout():
+    """Simple logout that clears the session"""
+    current_app.logger.info(f"Simple logout - clearing session: {dict(session)}")
+    session.clear()
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('auth.simple_login'))
+
 # Salesforce OAuth Routes
 
 @bp.route('/salesforce/authorize')
