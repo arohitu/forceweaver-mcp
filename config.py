@@ -61,20 +61,13 @@ class Config:
         # First try to get from environment variable (set dynamically)
         env_redirect_uri = os.environ.get('SALESFORCE_REDIRECT_URI')
         
-        # DEBUG: Log what we're getting
-        import sys
-        print(f"DEBUG: IS_STAGING = {cls.IS_STAGING}", file=sys.stderr)
-        print(f"DEBUG: SALESFORCE_REDIRECT_URI env var = {env_redirect_uri}", file=sys.stderr)
-        
         if env_redirect_uri:
-            print(f"DEBUG: Using env var value: {env_redirect_uri}", file=sys.stderr)
             return env_redirect_uri
         
         # Use the correct domain-based URLs
         api_domain = cls.get_api_domain()
         fallback_url = f'https://{api_domain}/api/auth/salesforce/callback'
         
-        print(f"DEBUG: Using fallback value: {fallback_url}", file=sys.stderr)
         return fallback_url
     
     # Static OAuth Configuration (fallback)

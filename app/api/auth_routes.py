@@ -98,23 +98,15 @@ def salesforce_callback():
     try:
         from flask import current_app
         
-        current_app.logger.info("=== SALESFORCE CALLBACK STARTED ===")
-        current_app.logger.info(f"Request URL: {request.url}")
-        current_app.logger.info(f"Request Host: {request.headers.get('Host')}")
-        current_app.logger.info(f"Request args: {dict(request.args)}")
-        current_app.logger.info(f"Full session contents: {dict(session)}")
-        current_app.logger.info(f"Session ID: {session.get('_id', 'No session ID')}")
-        current_app.logger.info(f"Session data: user_id_for_oauth={session.get('user_id_for_oauth')}, customer_email={session.get('customer_email')}")
-        
         # 1. Verify state and get code verifier
         returned_state = request.args.get('state')
         code_verifier = session.get('code_verifier')
         token_url = session.get('token_url') # Get the token URL from the session
         stored_state = session.get('oauth_state')
         
-        current_app.logger.info(f"State verification - Returned: {returned_state}, Stored: {stored_state}, Match: {returned_state == stored_state}")
-        current_app.logger.info(f"Code verifier present: {code_verifier is not None}")
-        current_app.logger.info(f"Token URL: {token_url}")
+        if returned_state != stored_state:
+            current_app.logger.error("OAuth state verification failed")
+            return jsonify({"error": "Invalid state parameter"}), 400
         
         if not returned_state or returned_state != stored_state or not code_verifier or not token_url:
             error_msg = f"OAuth validation failed - State match: {returned_state == stored_state}, Code verifier: {code_verifier is not None}, Token URL: {token_url is not None}"

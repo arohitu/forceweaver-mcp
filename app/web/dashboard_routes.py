@@ -21,7 +21,6 @@ dashboard_bp = Blueprint('dashboard', __name__)
 @login_required
 def test():
     """Simple test route to verify dashboard access"""
-    current_app.logger.info(f"Test route accessed by user: {current_user.id} ({current_user.email})")
     return {"status": "success", "message": f"Dashboard access working for {current_user.email}"}
 
 @dashboard_bp.route('/simple')
@@ -88,15 +87,10 @@ def get_or_create_customer():
 def index():
     """Main dashboard page"""
     try:
-        current_app.logger.info(f"Dashboard accessed by user: {current_user.id} ({current_user.email})")
-        
         # Get or create user's customer record
-        current_app.logger.info("Getting or creating customer record...")
         customer = get_or_create_customer()
-        current_app.logger.info(f"Customer record obtained: ID={customer.id if customer else None}")
         
         # Dashboard statistics
-        current_app.logger.info("Initializing dashboard statistics...")
         stats = {
             'has_salesforce_connection': bool(customer and customer.salesforce_connection),
             'has_api_key': bool(customer and customer.api_key),
@@ -104,7 +98,6 @@ def index():
             'last_health_check': None,
             'api_key_last_used': None
         }
-        current_app.logger.info(f"Initial stats: {stats}")
         
         if customer:
             try:

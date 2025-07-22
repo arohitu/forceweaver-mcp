@@ -19,19 +19,10 @@ web_auth_bp = Blueprint('web_auth', __name__)
 @web_auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """User login page"""
-    current_app.logger.info("=== LOGIN ROUTE ACCESSED ===")
-    current_app.logger.info(f"Request method: {request.method}")
-    current_app.logger.info(f"Current user authenticated: {current_user.is_authenticated}")
-    current_app.logger.info(f"Request path: {request.path}")
-    current_app.logger.info(f"Request args: {dict(request.args)}")
-    
     if current_user.is_authenticated:
-        current_app.logger.info(f"User already authenticated: {current_user.email} (ID: {current_user.id})")
-        current_app.logger.info("Redirecting authenticated user to dashboard")
         return redirect(url_for('dashboard.index'))
     
     form = LoginForm()
-    current_app.logger.info(f"Form created successfully: {type(form)}")
     
     if form.validate_on_submit():
         current_app.logger.info("=== LOGIN FORM SUBMITTED ===")

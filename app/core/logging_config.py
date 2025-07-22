@@ -39,7 +39,7 @@ def setup_logging(app):
                 'mode': 'a',
             },
             'debug_file': {
-                'level': 'DEBUG',
+                'level': 'WARNING',
                 'formatter': 'detailed',
                 'class': 'logging.FileHandler',
                 'filename': 'logs/debug.log',
@@ -61,17 +61,17 @@ def setup_logging(app):
             },
             'app': {
                 'handlers': ['default', 'error_file', 'debug_file'],
-                'level': 'DEBUG',  # Capture all app logs in debug file
+                'level': 'INFO',  # Reduce log verbosity in production
                 'propagate': False
             },
             'app.services.health_checker_service': {
                 'handlers': ['default', 'error_file', 'health_check_file'],
-                'level': 'DEBUG',  # Capture all health check logs
+                'level': 'INFO',  # Reduce log verbosity in production
                 'propagate': False
             },
             'app.services.salesforce_service': {
                 'handlers': ['default', 'error_file', 'debug_file'],
-                'level': 'DEBUG',  # Capture all Salesforce service logs
+                'level': 'INFO',  # Reduce log verbosity in production
                 'propagate': False
             },
             'gunicorn.error': {
@@ -98,4 +98,4 @@ def setup_logging(app):
     
     # Log startup message
     app.logger.info(f"ForceWeaver MCP API starting with log level: {log_level}")
-    app.logger.info("Health check debugging enabled - check logs/health_checks.log for detailed output") 
+    app.logger.info(f"Logging initialized with level: {log_level}") 

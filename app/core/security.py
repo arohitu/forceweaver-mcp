@@ -21,8 +21,7 @@ def _get_encryption_key():
     if not key:
         # Generate a new key if not provided
         key = Fernet.generate_key()
-        print(f"Generated new encryption key: {key.decode()}")
-        print("Please set this as ENCRYPTION_KEY in your environment variables")
+        logger.warning("No encryption key found in environment. Generated new key - please set ENCRYPTION_KEY in your environment variables")
     else:
         key = key.encode()
     return key
