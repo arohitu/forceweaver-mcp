@@ -61,11 +61,12 @@ class APIVersionForm(FlaskForm):
     api_version = SelectField('Preferred API Version', validators=[DataRequired()])
     submit = SubmitField('Save API Version')
     
-    def __init__(self, available_versions=None, *args, **kwargs):
+    def __init__(self, connection=None, *args, **kwargs):
         super(APIVersionForm, self).__init__(*args, **kwargs)
-        if available_versions:
-            # Convert list of versions to choices for SelectField
-            self.api_version.choices = [(v, f"{v} (Version {v[1:]})") for v in available_versions]
+        if connection:
+            # Get versions with labels from the connection
+            versions_with_labels = connection.get_versions_with_labels()
+            self.api_version.choices = versions_with_labels
         else:
             self.api_version.choices = []
 

@@ -90,9 +90,14 @@ class SalesforceConnection(db.Model):
         if self.available_api_versions:
             import json
             try:
-                return json.loads(self.available_api_versions)
+                version_data = json.loads(self.available_api_versions)
+                # Handle both old format (simple list) and new format (with labels)
+                if isinstance(version_data, list):
+                    return version_data  # Old format compatibility
+                elif isinstance(version_data, dict) and 'versions' in version_data:
+                    return version_data['versions']  # New format
             except (json.JSONDecodeError, TypeError):
-                return []
+                pass
         return []
     
     @available_versions_list.setter
@@ -101,6 +106,31 @@ class SalesforceConnection(db.Model):
         import json
         self.available_api_versions = json.dumps(versions) if versions else None
         self.api_versions_last_updated = datetime.utcnow()
+    
+    def get_version_label(self, version):
+        """Get the display label for a specific API version."""
+        if self.available_api_versions:
+            import json
+            try:
+                version_data = json.loads(self.available_api_versions)
+                if isinstance(version_data, dict) and 'labels' in version_data:
+                    return version_data['labels'].get(version, f"Version {version[1:]}")
+            except (json.JSONDecodeError, TypeError):
+                pass
+        # Fallback to simple format
+        return f"Version {version[1:]}" if version.startswith('v') else version
+    
+    def get_versions_with_labels(self):
+        """Get versions with their labels for form display."""
+        versions = self.available_versions_list
+        if not versions:
+            return []
+        
+        result = []
+        for version in versions:
+            label = self.get_version_label(version)
+            result.append((version, f"{version} - {label}"))
+        return result
     
     def get_effective_api_version(self):
         """Get the API version to use (preferred or latest available)."""

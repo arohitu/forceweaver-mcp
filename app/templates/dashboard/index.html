@@ -273,7 +273,11 @@
                         <br><br>
                         <strong>API Version:</strong><br>
                         {% if customer.salesforce_connection %}
-                            <span class="badge bg-primary">{{ customer.salesforce_connection.get_effective_api_version() }}</span>
+                            {% set current_version = customer.salesforce_connection.get_effective_api_version() %}
+                            {% set version_label = customer.salesforce_connection.get_version_label(current_version) %}
+                            <span class="badge bg-primary">{{ current_version }}</span>
+                            <small class="text-muted">{{ version_label }}</small>
+                            <br>
                             <small class="text-muted">
                                 {% if customer.salesforce_connection.preferred_api_version %}
                                     (preferred version)

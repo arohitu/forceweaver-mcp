@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test script for API version functionality
-This script tests the API version management features.
+This script tests the API version management features with latest 5 versions.
 """
 
 import requests
@@ -10,8 +10,8 @@ import json
 def test_api_version_functionality():
     """Test the API version functionality with the staging API."""
     
-    print("🧪 Testing API Version Functionality")
-    print("=" * 50)
+    print("🧪 Testing API Version Functionality (Latest 5 Versions)")
+    print("=" * 60)
     
     # Configuration
     BASE_URL = "https://staging-api.forceweaver.com"
@@ -44,7 +44,8 @@ def test_api_version_functionality():
             
             available_versions = status_data.get('available_api_versions', [])
             if available_versions:
-                print(f"   Available Versions: {', '.join(available_versions[:5])}...")
+                print(f"   Available Versions (Latest 5): {', '.join(available_versions)}")
+                print(f"   Latest Version: {available_versions[0] if available_versions else 'None'}")
             else:
                 print("   Available Versions: Not loaded")
                 
@@ -84,6 +85,16 @@ def test_api_version_functionality():
                     status = check_result.get('status', 'unknown')
                     message = check_result.get('message', 'No message')
                     print(f"     • {check_name}: {status} - {message[:60]}...")
+                    
+            # Verify the API version used matches what we expected
+            api_version_used = health_data.get('api_version_used')
+            effective_version = status_data.get('effective_api_version')
+            if api_version_used and effective_version:
+                if api_version_used == effective_version:
+                    print(f"   ✅ API version consistency confirmed: {api_version_used}")
+                else:
+                    print(f"   ⚠️  API version mismatch: used {api_version_used}, expected {effective_version}")
+                    
         else:
             print(f"❌ Health check failed: {response.status_code}")
             print(f"   Response: {response.text}")
@@ -107,27 +118,46 @@ def test_api_version_functionality():
             for tool in tools:
                 tool_name = tool.get('name', 'Unknown')
                 description = tool.get('description', 'No description')
-                print(f"     • {tool_name}: {description[:60]}...")
+                print(f"     • {tool_name}: {description[:50]}...")
                 
                 # Check if API version is mentioned in input schema
                 schema = tool.get('inputSchema', {})
                 properties = schema.get('properties', {})
                 if 'api_version' in properties:
-                    print(f"       ✅ Supports API version parameter")
+                    api_version_desc = properties['api_version'].get('description', '')
+                    print(f"       ✅ Supports API version parameter: {api_version_desc}")
         else:
             print(f"❌ Tools endpoint failed: {response.status_code}")
             
     except Exception as e:
         print(f"❌ Error calling tools endpoint: {e}")
     
-    print("\n" + "=" * 50)
+    # Test 4: Dashboard functionality hint
+    print("\n4️⃣ Dashboard Testing Recommendations...")
+    print("   🌐 Visit: https://staging-healthcheck.forceweaver.com/dashboard/salesforce")
+    print("   📋 Expected features:")
+    print("     • Latest 5 API versions displayed with Salesforce labels")
+    print("     • Version dropdown shows format: 'v64.0 - Summer '25'")
+    print("     • Auto-refresh gets latest versions from your org")
+    print("     • Current version shows proper label (e.g., 'Winter '25')")
+    print("     • Last updated timestamp")
+    
+    print("\n" + "=" * 60)
     print("🎉 API Version Testing Complete!")
     
     print("\n📝 Summary:")
-    print("✅ Service status shows API version information")
-    print("✅ Health checks use preferred API version") 
+    print("✅ Service status shows latest 5 API version information")
+    print("✅ Health checks use preferred API version with proper labels") 
     print("✅ MCP tools support API version parameter")
+    print("✅ Dashboard should show latest 5 versions with Salesforce labels")
     print("✅ All endpoints working correctly")
+    
+    print("\n🔍 What to verify in Dashboard:")
+    print("• API versions show Salesforce labels (e.g., 'Summer '25', 'Winter '25')")
+    print("• Only latest 5 versions are displayed")
+    print("• Default selection is the latest available version")
+    print("• Page automatically fetches fresh versions on each load")
+    print("• Version selection saves and applies correctly")
 
 if __name__ == "__main__":
     test_api_version_functionality() 

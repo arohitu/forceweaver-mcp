@@ -164,22 +164,25 @@ def salesforce():
     api_version_form = None
     
     if connection:
-        # Update API versions if needed (once per day max)
+        # Always fetch fresh API versions when page loads (force update for dashboard display)
         try:
-            available_versions = update_connection_api_versions(connection)
+            current_app.logger.info("Fetching latest API versions for dashboard display")
+            available_versions = update_connection_api_versions(connection, force_update=True)
+            current_app.logger.info(f"Retrieved {len(available_versions)} API versions")
         except Exception as e:
             current_app.logger.error(f"Error updating API versions: {e}")
             available_versions = connection.available_versions_list or []
         
-        # Create API version form with available versions
+        # Create API version form with the connection object (includes labels)
         if available_versions:
-            api_version_form = APIVersionForm(available_versions=available_versions)
+            api_version_form = APIVersionForm(connection=connection)
             # Set current value
             if connection.preferred_api_version:
                 api_version_form.api_version.data = connection.preferred_api_version
-            else:
+            elif available_versions:
                 # Default to latest version
                 api_version_form.api_version.data = available_versions[0]
+                current_app.logger.info(f"Defaulting to latest API version: {available_versions[0]}")
     
     return render_template('dashboard/salesforce.html', 
                          customer=customer, 
@@ -321,13 +324,19 @@ def update_api_version():
         return redirect(url_for('dashboard.salesforce'))
     
     connection = customer.salesforce_connection
-    available_versions = connection.available_versions_list or []
+    
+    # Always get fresh versions for validation
+    try:
+        available_versions = update_connection_api_versions(connection, force_update=True)
+    except Exception as e:
+        current_app.logger.error(f"Error fetching API versions: {e}")
+        available_versions = connection.available_versions_list or []
     
     if not available_versions:
         flash('No API versions available. Please refresh the version list first.', 'error')
         return redirect(url_for('dashboard.salesforce'))
     
-    form = APIVersionForm(available_versions=available_versions)
+    form = APIVersionForm(connection=connection)
     
     if form.validate_on_submit():
         new_version = form.api_version.data
@@ -342,10 +351,13 @@ def update_api_version():
         connection.preferred_api_version = new_version
         db.session.commit()
         
+        version_label = connection.get_version_label(new_version)
+        
         if old_version:
-            flash(f'API version updated from {old_version} to {new_version}', 'success')
+            old_label = connection.get_version_label(old_version)
+            flash(f'API version updated from {old_version} ({old_label}) to {new_version} ({version_label})', 'success')
         else:
-            flash(f'API version set to {new_version}', 'success')
+            flash(f'API version set to {new_version} ({version_label})', 'success')
     else:
         flash('Please select a valid API version', 'error')
     
@@ -364,23 +376,25 @@ def refresh_api_versions():
     try:
         connection = customer.salesforce_connection
         
-        # Force refresh by clearing the last updated timestamp
-        connection.api_versions_last_updated = None
-        db.session.commit()
+        current_app.logger.info("Manually refreshing API versions from Salesforce")
         
-        # Fetch new versions
-        available_versions = update_connection_api_versions(connection)
+        # Force refresh from Salesforce
+        available_versions = update_connection_api_versions(connection, force_update=True)
         
         if available_versions:
-            flash(f'Successfully refreshed API versions. Found {len(available_versions)} versions.', 'success')
+            # Get the latest version info for display
+            latest_version = available_versions[0]
+            latest_label = connection.get_version_label(latest_version)
+            
+            flash(f'Successfully refreshed API versions. Found {len(available_versions)} versions. Latest: {latest_version} ({latest_label})', 'success')
             
             # If no preferred version is set, default to the latest
             if not connection.preferred_api_version:
-                connection.preferred_api_version = available_versions[0]
+                connection.preferred_api_version = latest_version
                 db.session.commit()
-                flash(f'Set preferred API version to latest: {available_versions[0]}', 'info')
+                flash(f'Set preferred API version to latest: {latest_version} ({latest_label})', 'info')
         else:
-            flash('Unable to refresh API versions. Please try again later.', 'warning')
+            flash('Unable to refresh API versions. Please check your Salesforce connection and try again.', 'warning')
     
     except Exception as e:
         current_app.logger.error(f"Error refreshing API versions: {e}")
