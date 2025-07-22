@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+import json
 
 class User(UserMixin, db.Model):
     """Web dashboard user model for human authentication"""
@@ -77,16 +78,16 @@ class SalesforceConnection(db.Model):
     org_type = Column(String(50))  # Production, Sandbox, etc.
     is_sandbox = Column(Boolean, default=False)
     
-    # API Version Configuration - temporarily disabled for deployment
-    # preferred_api_version = Column(String(10))  # e.g., "v59.0", defaults to latest if null
-    # available_api_versions = Column(Text)  # JSON array of available versions
-    # api_versions_last_updated = Column(DateTime)
+    # API Version Configuration
+    preferred_api_version = Column(String(10))  # e.g., "v59.0", defaults to latest if null
+    available_api_versions = Column(Text)  # JSON array of available versions
+    api_versions_last_updated = Column(DateTime)
     
-    # Temporarily disabled API version methods - will re-enable after deployment
-    """
+    customer = relationship("Customer", back_populates="salesforce_connection")
+    
     @property
     def available_versions_list(self):
-        """Get available API versions as a list."""
+        """Get available API versions as a list"""
         if not self.available_api_versions:
             return []
         
@@ -104,14 +105,14 @@ class SalesforceConnection(db.Model):
 
     @available_versions_list.setter
     def available_versions_list(self, versions):
-        """Set available API versions from a list."""
+        """Set available API versions from a list"""
         if versions:
             self.available_api_versions = json.dumps(versions)
         else:
             self.available_api_versions = None
     
     def get_version_label(self, version):
-        """Get the human-readable label for an API version."""
+        """Get the human-readable label for an API version"""
         if not self.available_api_versions or not version:
             return version or "Unknown"
             
@@ -125,7 +126,7 @@ class SalesforceConnection(db.Model):
         return version
     
     def get_versions_with_labels(self):
-        """Get versions formatted for form choices: [(value, label), ...]."""
+        """Get versions formatted for form choices: [(value, label), ...]"""
         versions = self.available_versions_list
         if not versions:
             return []
@@ -139,7 +140,7 @@ class SalesforceConnection(db.Model):
         return choices
 
     def get_effective_api_version(self):
-        """Get the API version to use (preferred or latest available)."""
+        """Get the API version to use (preferred or latest available)"""
         if self.preferred_api_version:
             return self.preferred_api_version
         
@@ -150,13 +151,6 @@ class SalesforceConnection(db.Model):
         
         # Fallback to a more recent default version
         return "v61.0"  # Summer '24 - more recent than v52.0
-    """
-    
-    def get_effective_api_version(self):
-        """Get the API version to use - fallback implementation."""
-        return "v61.0"  # Use recent version as fallback
-    
-    customer = relationship("Customer", back_populates="salesforce_connection")
 
 
 class HealthCheckHistory(db.Model):
