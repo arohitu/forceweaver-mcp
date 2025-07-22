@@ -204,7 +204,7 @@ def get_available_tools():
                             "description": "Salesforce API version to use (e.g., 'v64.0'). If not specified, uses the customer's preferred version or the latest available."
                         }
                     },
-                    "additionalProperties": false
+                    "additionalProperties": False
                 }
             }
         ]
@@ -213,7 +213,7 @@ def get_available_tools():
             "tools": tools,
             "capabilities": {
                 "tools": {
-                    "listChanged": false
+                    "listChanged": False
                 }
             }
         }
