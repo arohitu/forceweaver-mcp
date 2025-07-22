@@ -2,12 +2,13 @@
 ForceWeaver MCP Server - Flask Application Factory
 """
 import os
-from flask import Flask, current_app
+from flask import Flask, request, current_app
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_session import Session
 import logging
 
 # Initialize extensions
@@ -15,6 +16,7 @@ db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
 limiter = Limiter(key_func=get_remote_address)
+sess = Session()  # Flask-Session for database-backed sessions
 
 def create_app():
     """Application factory"""
@@ -29,8 +31,12 @@ def create_app():
     database_url = os.getenv('DATABASE_URL', 'sqlite:///instance/forceweaver.db')
     app.config['FLASK_ENV'] = os.getenv('FLASK_ENV', 'production')
     
-    # **Enhanced Flask session configuration for HTTPS**
-    # Temporarily disable HTTPS-only cookies for debugging
+    # **Enhanced Flask session configuration for Heroku**
+    # Use database-backed sessions instead of filesystem (critical for Heroku)
+    app.config['SESSION_TYPE'] = 'sqlalchemy'
+    app.config['SESSION_SQLALCHEMY'] = db
+    app.config['SESSION_PERMANENT'] = False
+    app.config['SESSION_USE_SIGNER'] = True
     app.config['SESSION_COOKIE_SECURE'] = False  # Allow over HTTP for debugging
     app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
@@ -51,6 +57,7 @@ def create_app():
     migrate.init_app(app, db)
     login_manager.init_app(app)
     limiter.init_app(app)
+    sess.init_app(app)  # Initialize database-backed sessions
     
     # Login manager configuration
     login_manager.login_view = '/api/auth/login'  # Updated to match the new route structure
