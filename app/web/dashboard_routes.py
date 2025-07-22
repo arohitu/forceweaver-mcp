@@ -13,7 +13,11 @@ bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 @bp.route('/')
 @login_required
 def index():
-    """Dashboard home page"""
+    """Dashboard home"""
+    current_app.logger.info(f"Dashboard access attempt - current_user: {current_user}")
+    current_app.logger.info(f"Dashboard - is_authenticated: {current_user.is_authenticated if current_user else 'No current_user'}")
+    current_app.logger.info(f"Dashboard - user ID: {current_user.get_id() if current_user and hasattr(current_user, 'get_id') else 'No ID available'}")
+    
     # Get user stats
     api_keys_count = APIKey.query.filter_by(user_id=current_user.id, is_active=True).count()
     orgs_count = SalesforceOrg.query.filter_by(user_id=current_user.id, is_active=True).count()

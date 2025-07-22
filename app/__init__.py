@@ -25,9 +25,15 @@ def create_app():
     app = Flask(__name__, template_folder=template_dir)
     
     # Configuration
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://localhost/forceweaver_mcp')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+    app.config['DATABASE_URL'] = os.getenv('DATABASE_URL', 'sqlite:///instance/forceweaver.db')
+    app.config['FLASK_ENV'] = os.getenv('FLASK_ENV', 'production')
+    
+    # **Enhanced Flask session configuration for HTTPS**
+    app.config['SESSION_COOKIE_SECURE'] = True  # Only send over HTTPS
+    app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+    app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
     
     # Handle Heroku's postgres:// -> postgresql:// requirement
     if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
@@ -77,7 +83,14 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         from app.models.user import User
-        return db.session.get(User, user_id)  # Updated to use modern SQLAlchemy syntax
+        current_app.logger.info(f"load_user called with user_id: {user_id} (type: {type(user_id)})")
+        try:
+            user = db.session.get(User, user_id)  # Updated to use modern SQLAlchemy syntax
+            current_app.logger.info(f"load_user result: {user.email if user else 'None'}")
+            return user
+        except Exception as e:
+            current_app.logger.error(f"load_user error: {e}")
+            return None
     
     # Logging configuration
     if not app.debug:
