@@ -81,7 +81,8 @@ class RateConfiguration(db.Model):
     
     @classmethod
     def create_tier(cls, tier_name, display_name, calls_per_hour=100, burst_limit=20, 
-                    description=None, created_by=None, is_default=False):
+                    calls_per_day=None, calls_per_month=None, description=None, 
+                    created_by=None, is_default=False):
         """Create a new rate configuration tier"""
         # If this is being set as default, remove default from other tiers
         if is_default:
@@ -92,6 +93,8 @@ class RateConfiguration(db.Model):
             display_name=display_name,
             calls_per_hour=calls_per_hour,
             burst_limit=burst_limit,
+            calls_per_day=calls_per_day,
+            calls_per_month=calls_per_month,
             description=description,
             created_by=created_by,
             is_default=is_default
