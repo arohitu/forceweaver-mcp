@@ -1,71 +1,94 @@
 #!/usr/bin/env python3
 """
-Database seed script for ForceWeaver MCP Server
-Creates initial admin user and default configurations
+Database seeding script for ForceWeaver MCP Server
 """
-import os
 from app import create_app, db
 from app.models.user import User
 from app.models.rate_configuration import RateConfiguration
 
 def seed_database():
-    """Seed the database with initial data"""
-    app = create_app()
+    """Create tables and seed initial data"""
+    print("Creating database tables...")
+    db.create_all()
     
-    with app.app_context():
-        print("Creating database tables...")
-        db.create_all()
+    # Seed rate configurations
+    print("Creating default rate configurations...")
+    try:
+        if not RateConfiguration.query.filter_by(is_default=True).first():
+            default_rate = RateConfiguration(
+                tier_name='default',
+                display_name='Default',
+                calls_per_hour=100,
+                burst_limit=20,
+                is_default=True,
+                description='Default rate configuration for new users'
+            )
+            db.session.add(default_rate)
+            db.session.commit()
+            print("Default rate configuration created")
+    except Exception as e:
+        print(f"Warning: Could not create rate configurations: {e}")
+        db.session.rollback()
+    
+    # Create admin user
+    admin_email = "admin@forceweaver.com"
+    admin_password = "admin123"
+    
+    print(f"Checking for admin user: {admin_email}")
+    
+    try:
+        # Check if admin user exists
+        existing_admin = User.query.filter_by(email=admin_email).first()
         
-        # Create default rate configurations
-        print("Creating default rate configurations...")
-        try:
-            default_tiers = RateConfiguration.initialize_default_tiers()
-            if default_tiers:
-                print(f"Created {len(default_tiers)} rate configuration tiers")
-            else:
-                print("Rate configuration tiers already exist")
-        except Exception as e:
-            print(f"Warning: Could not create rate configurations: {e}")
-        
-        # Create admin user
-        admin_email = os.environ.get('ADMIN_EMAIL', 'admin@forceweaver.com')
-        admin_password = os.environ.get('ADMIN_PASSWORD', 'forceweaver123')  # Change in production!
-        admin_name = os.environ.get('ADMIN_NAME', 'ForceWeaver Admin')
-        
-        print(f"Checking for admin user: {admin_email}")
-        
-        # Check if admin already exists
-        existing_admin = User.get_by_email(admin_email)
-        
-        if existing_admin:
-            print("Admin user already exists")
-            if not existing_admin.is_admin:
-                existing_admin.is_admin = True
-                db.session.commit()
-                print("Updated existing user to admin")
+        if not existing_admin:
+            print("Creating admin user...")
+            admin_user = User(
+                email=admin_email,
+                name="System Administrator"
+            )
+            admin_user.set_password(admin_password)
+            admin_user.is_admin = True
+            admin_user.is_active = True
+            
+            db.session.add(admin_user)
+            db.session.commit()
+            print(f"Admin user created: {admin_email}")
         else:
-            try:
-                admin_user = User.create_user(
-                    email=admin_email,
-                    name=admin_name,
-                    password=admin_password,
-                    is_admin=True
-                )
-                print(f"Created admin user: {admin_email}")
-                print(f"Admin password: {admin_password}")
-                print("*** PLEASE CHANGE THE ADMIN PASSWORD AFTER FIRST LOGIN ***")
-            except Exception as e:
-                print(f"Error creating admin user: {e}")
+            print("Admin user already exists")
+            
+        # Create test user  
+        test_email = "test@forceweaver.com"
+        test_password = "test123"
         
-        print("Database seeding completed!")
+        existing_test = User.query.filter_by(email=test_email).first()
         
-        # Print summary
-        user_count = User.query.count()
-        rate_config_count = RateConfiguration.query.count()
-        
-        print("\nDatabase Summary:")
-        print(f"- Users: {user_count}")
-        print(f"- Rate Configurations: {rate_config_count}")
+        if not existing_test:
+            print("Creating test user...")
+            test_user = User(
+                email=test_email,
+                name="Test User"
+            )
+            test_user.set_password(test_password)
+            test_user.is_active = True
+            
+            db.session.add(test_user)
+            db.session.commit()
+            print(f"Test user created: {test_email}")
+        else:
+            print("Test user already exists")
+            
+    except Exception as e:
+        print(f"Error creating users: {e}")
+        db.session.rollback()
+    
+    print("Database seeding completed!")
+    
+    # Print summary
+    print("\nDatabase Summary:")
+    print(f"- Users: {User.query.count()}")
+    print(f"- Rate Configurations: {RateConfiguration.query.count()}")
 
-if __name__ == "__main__":
-    seed_database() 
+if __name__ == '__main__':
+    app = create_app()
+    with app.app_context():
+        seed_database() 
