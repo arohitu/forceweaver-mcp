@@ -77,61 +77,67 @@ class SalesforceConnection(db.Model):
     org_type = Column(String(50))  # Production, Sandbox, etc.
     is_sandbox = Column(Boolean, default=False)
     
-    # API Version Configuration
-    preferred_api_version = Column(String(10))  # e.g., "v59.0", defaults to latest if null
-    available_api_versions = Column(Text)  # JSON array of available versions
-    api_versions_last_updated = Column(DateTime)
+    # API Version Configuration - temporarily disabled for deployment
+    # preferred_api_version = Column(String(10))  # e.g., "v59.0", defaults to latest if null
+    # available_api_versions = Column(Text)  # JSON array of available versions
+    # api_versions_last_updated = Column(DateTime)
     
-    customer = relationship("Customer", back_populates="salesforce_connection")
-    
+    # Temporarily disabled API version methods - will re-enable after deployment
+    """
     @property
     def available_versions_list(self):
         """Get available API versions as a list."""
-        if self.available_api_versions:
-            import json
-            try:
-                version_data = json.loads(self.available_api_versions)
-                # Handle both old format (simple list) and new format (with labels)
-                if isinstance(version_data, list):
-                    return version_data  # Old format compatibility
-                elif isinstance(version_data, dict) and 'versions' in version_data:
-                    return version_data['versions']  # New format
-            except (json.JSONDecodeError, TypeError):
-                pass
-        return []
-    
+        if not self.available_api_versions:
+            return []
+        
+        try:
+            version_data = json.loads(self.available_api_versions)
+            # Handle both old format (simple list) and new format (dict with versions and labels)
+            if isinstance(version_data, list):
+                return version_data
+            elif isinstance(version_data, dict) and 'versions' in version_data:
+                return version_data['versions']
+            else:
+                return []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
     @available_versions_list.setter
     def available_versions_list(self, versions):
         """Set available API versions from a list."""
-        import json
-        self.available_api_versions = json.dumps(versions) if versions else None
-        self.api_versions_last_updated = datetime.utcnow()
+        if versions:
+            self.available_api_versions = json.dumps(versions)
+        else:
+            self.available_api_versions = None
     
     def get_version_label(self, version):
-        """Get the display label for a specific API version."""
-        if self.available_api_versions:
-            import json
-            try:
-                version_data = json.loads(self.available_api_versions)
-                if isinstance(version_data, dict) and 'labels' in version_data:
-                    return version_data['labels'].get(version, f"Version {version[1:]}")
-            except (json.JSONDecodeError, TypeError):
-                pass
-        # Fallback to simple format
-        return f"Version {version[1:]}" if version.startswith('v') else version
+        """Get the human-readable label for an API version."""
+        if not self.available_api_versions or not version:
+            return version or "Unknown"
+            
+        try:
+            version_data = json.loads(self.available_api_versions)
+            if isinstance(version_data, dict) and 'labels' in version_data:
+                return version_data['labels'].get(version, version)
+        except (json.JSONDecodeError, TypeError):
+            pass
+            
+        return version
     
     def get_versions_with_labels(self):
-        """Get versions with their labels for form display."""
+        """Get versions formatted for form choices: [(value, label), ...]."""
         versions = self.available_versions_list
         if not versions:
             return []
         
-        result = []
+        choices = []
         for version in versions:
             label = self.get_version_label(version)
-            result.append((version, f"{version} - {label}"))
-        return result
-    
+            display_label = f"{version} - {label}" if label and label != version else version
+            choices.append((version, display_label))
+        
+        return choices
+
     def get_effective_api_version(self):
         """Get the API version to use (preferred or latest available)."""
         if self.preferred_api_version:
@@ -144,6 +150,14 @@ class SalesforceConnection(db.Model):
         
         # Fallback to a more recent default version
         return "v61.0"  # Summer '24 - more recent than v52.0
+    """
+    
+    def get_effective_api_version(self):
+        """Get the API version to use - fallback implementation."""
+        return "v61.0"  # Use recent version as fallback
+    
+    customer = relationship("Customer", back_populates="salesforce_connection")
+
 
 class HealthCheckHistory(db.Model):
     """Historical health check results for dashboard display"""
