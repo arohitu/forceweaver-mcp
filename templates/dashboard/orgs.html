@@ -10,7 +10,7 @@
             <h1 class="fw-bold">
                 <i class="bi bi-building text-success"></i> Salesforce Organizations
             </h1>
-            <p class="text-muted">Configure your Salesforce org connections for health checking and analysis.</p>
+            <p class="text-muted">Connect your Salesforce orgs for health checking and analysis via secure OAuth.</p>
         </div>
     </div>
 
@@ -24,108 +24,59 @@
                     </h5>
                 </div>
                 <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Secure OAuth Authentication</strong> - You'll be redirected to Salesforce to sign in with your username and password. We never store your Salesforce credentials.
+                    </div>
+                    
                     <form method="POST" action="{{ url_for('dashboard.create_org') }}">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="org_identifier" class="form-label">Org Identifier *</label>
                                 <input type="text" class="form-control" id="org_identifier" name="org_identifier" 
                                        placeholder="e.g., production, sandbox, dev" required pattern="[a-zA-Z0-9_-]+">
-                                <div class="form-text">Unique identifier for this org (letters, numbers, hyphens, underscores only)</div>
+                                <div class="form-text">Give this org a unique name (letters, numbers, hyphens, underscores only)</div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="instance_url" class="form-label">Salesforce Instance URL *</label>
-                                <input type="url" class="form-control" id="instance_url" name="instance_url" 
-                                       placeholder="https://yourorg.my.salesforce.com" required>
-                                <div class="form-text">Your Salesforce org's domain</div>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="client_id" class="form-label">Client ID *</label>
-                                <input type="text" class="form-control" id="client_id" name="client_id" 
-                                       placeholder="Connected App Client ID" required>
-                                <div class="form-text">From your Salesforce Connected App</div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="client_secret" class="form-label">Client Secret *</label>
-                                <input type="password" class="form-control" id="client_secret" name="client_secret" 
-                                       placeholder="Connected App Client Secret" required>
-                                <div class="form-text">Will be encrypted and stored securely</div>
-                            </div>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
+                                <label class="form-label">Org Type *</label>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="is_sandbox" name="is_sandbox">
-                                    <label class="form-check-label" for="is_sandbox">
-                                        This is a Sandbox org
+                                    <input class="form-check-input" type="radio" name="org_type" id="production" value="production" checked>
+                                    <label class="form-check-label" for="production">
+                                        <strong>Production / Developer Edition</strong>
+                                        <div class="form-text">Use login.salesforce.com</div>
                                     </label>
                                 </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="org_type" id="sandbox" value="sandbox">
+                                    <label class="form-check-label" for="sandbox">
+                                        <strong>Sandbox</strong>
+                                        <div class="form-text">Use test.salesforce.com</div>
+                                    </label>
+                                </div>
+                                <input type="hidden" name="is_sandbox" id="is_sandbox" value="false">
                             </div>
                         </div>
                         
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-plus"></i> Connect Salesforce Org
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-up-right"></i> Connect to Salesforce
                         </button>
+                        <div class="form-text mt-2">
+                            You'll be redirected to Salesforce to complete the OAuth authentication process.
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Setup Instructions -->
-    <div class="row mb-4">
-        <div class="col">
-            <div class="card border-warning">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="card-title mb-0">
-                        <i class="bi bi-gear"></i> Salesforce Connected App Setup
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p>To connect your Salesforce org, you need to create a Connected App with OAuth settings:</p>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>1. Create Connected App</h6>
-                            <ul class="small">
-                                <li>Go to Salesforce Setup → Apps → App Manager</li>
-                                <li>Click "New Connected App"</li>
-                                <li>Fill in basic information</li>
-                                <li>Enable OAuth Settings</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>2. OAuth Configuration</h6>
-                            <ul class="small">
-                                <li><strong>Callback URL:</strong> <code>https://mcp.forceweaver.com/callback</code></li>
-                                <li><strong>OAuth Scopes:</strong> "Perform requests on your behalf at any time (refresh_token, offline_access)" and "Access and manage your data (api)"</li>
-                                <li><strong>Grant Types:</strong> Enable "Client Credentials Flow"</li>
-                            </ul>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-3">
-                        <div class="alert alert-info small">
-                            <strong>Note:</strong> After creating the Connected App, you may need to wait 2-10 minutes for changes to take effect, 
-                            then get the Client ID and Client Secret from the Connected App details.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Existing Orgs -->
+    <!-- Connected Organizations -->
     {% if orgs %}
     <div class="row">
         <div class="col">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i class="bi bi-list"></i> Connected Organizations ({{ orgs|length }})
+                        <i class="bi bi-building-check text-success"></i> Your Connected Organizations ({{ orgs|length }})
                     </h5>
                 </div>
                 <div class="card-body">
@@ -134,87 +85,109 @@
                             <thead>
                                 <tr>
                                     <th>Identifier</th>
-                                    <th>Organization</th>
-                                    <th>Type</th>
+                                    <th>Organization Name</th>
                                     <th>Instance URL</th>
-                                    <th>Created</th>
-                                    <th>Last Auth</th>
-                                    <th>Usage</th>
+                                    <th>Type</th>
                                     <th>Status</th>
+                                    <th>Connected</th>
+                                    <th>Last Used</th>
+                                    <th>Usage Count</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for org in orgs %}
                                 <tr>
                                     <td>
-                                        <strong class="text-primary">{{ org.org_identifier }}</strong>
-                                        {% if org.last_error %}
-                                        <br><small class="text-danger">
-                                            <i class="bi bi-exclamation-triangle"></i> Auth Error
-                                        </small>
+                                        <strong>{{ org.org_identifier }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if org.org_name %}
+                                            {{ org.org_name }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {{ org.org_name or 'Not Retrieved' }}
-                                        {% if org.salesforce_org_id %}
-                                        <br><small class="text-muted">{{ org.salesforce_org_id }}</small>
+                                        {% if org.instance_url %}
+                                            <a href="{{ org.instance_url }}" target="_blank" class="text-decoration-none">
+                                                {{ org.instance_url|replace('https://', '')|truncate(30) }}
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">Not connected</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if org.is_sandbox %}
-                                            <span class="badge bg-warning text-dark">
-                                                <i class="bi bi-wrench"></i> Sandbox
-                                            </span>
+                                            <span class="badge bg-warning">Sandbox</span>
                                         {% else %}
-                                            <span class="badge bg-primary">
-                                                <i class="bi bi-building"></i> Production
-                                            </span>
+                                            <span class="badge bg-primary">Production</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{{ org.instance_url }}" target="_blank" class="text-decoration-none small">
-                                            {{ org.instance_url|replace('https://', '') }}
-                                            <i class="bi bi-box-arrow-up-right"></i>
-                                        </a>
+                                        {% if org.oauth_completed and org.is_active %}
+                                            <span class="badge bg-success">Connected</span>
+                                        {% elif not org.oauth_completed %}
+                                            <span class="badge bg-warning">OAuth Pending</span>
+                                        {% elif not org.is_active %}
+                                            <span class="badge bg-danger">Inactive</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Unknown</span>
+                                        {% endif %}
                                     </td>
-                                    <td>{{ org.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if org.created_at %}
+                                            {{ org.created_at.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if org.last_auth %}
-                                            <span class="text-success">
-                                                {{ org.last_auth.strftime('%m/%d %H:%M') }}
-                                            </span>
+                                            {{ org.last_auth.strftime('%Y-%m-%d %H:%M') }}
                                         {% else %}
                                             <span class="text-muted">Never</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <span class="badge bg-info">{{ org.usage_count }} calls</span>
+                                        <span class="badge bg-secondary">{{ org.usage_count }}</span>
                                     </td>
                                     <td>
                                         {% if org.is_active %}
-                                            {% if org.last_error %}
-                                                <span class="badge bg-warning text-dark" 
-                                                      title="{{ org.last_error }}">Error</span>
-                                            {% else %}
-                                                <span class="badge bg-success">Active</span>
+                                            {% if not org.oauth_completed %}
+                                                <a href="{{ url_for('auth.salesforce_authorize', org_identifier=org.org_identifier, is_sandbox=org.is_sandbox) }}" 
+                                                   class="btn btn-sm btn-outline-primary" title="Complete OAuth">
+                                                    <i class="bi bi-box-arrow-up-right"></i>
+                                                </a>
                                             {% endif %}
+                                            <form method="POST" action="{{ url_for('dashboard.deactivate_org', org_id=org.id) }}" 
+                                                  style="display: inline;" 
+                                                  onsubmit="return confirm('Are you sure you want to disconnect this Salesforce org? This action cannot be undone.')">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                        title="Disconnect org">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            </form>
                                         {% else %}
-                                            <span class="badge bg-secondary">Inactive</span>
+                                            <button class="btn btn-sm btn-outline-secondary" disabled 
+                                                    title="Org is disconnected">
+                                                <i class="bi bi-dash-circle"></i>
+                                            </button>
                                         {% endif %}
                                     </td>
                                 </tr>
-                                {% if org.last_error %}
-                                <tr class="table-warning">
-                                    <td colspan="8" class="small">
-                                        <i class="bi bi-exclamation-triangle text-warning"></i>
-                                        <strong>Last Error:</strong> {{ org.last_error }}
-                                    </td>
-                                </tr>
-                                {% endif %}
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
+                    
+                    {% if orgs|length >= 10 %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        You have {{ orgs|length }} connected orgs. Consider disconnecting unused orgs for better security.
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -222,82 +195,35 @@
     {% else %}
     <div class="row">
         <div class="col">
-            <div class="card border-success">
+            <div class="card border-primary">
                 <div class="card-body text-center p-5">
-                    <i class="bi bi-building text-success" style="font-size: 4rem;"></i>
-                    <h3 class="mt-3">No Salesforce Orgs Connected</h3>
+                    <i class="bi bi-building text-primary" style="font-size: 4rem;"></i>
+                    <h3 class="mt-3">No Connected Orgs Yet</h3>
                     <p class="text-muted">
-                        Connect your first Salesforce organization to start using ForceWeaver health checking tools.
+                        Connect your first Salesforce org to start using ForceWeaver MCP health checks and analysis.
                     </p>
                     <p class="text-muted">
-                        You can connect multiple orgs - production, sandbox, and development environments.
+                        <strong>Secure OAuth:</strong> We use industry-standard OAuth 2.0 authentication. 
+                        Your Salesforce username and password are never stored by ForceWeaver.
                     </p>
                 </div>
             </div>
         </div>
     </div>
     {% endif %}
-
-    <!-- Usage Examples -->
-    {% if orgs %}
-    <div class="row mt-4">
-        <div class="col">
-            <div class="card border-info">
-                <div class="card-header bg-info text-white">
-                    <h5 class="card-title mb-0">
-                        <i class="bi bi-lightbulb"></i> Usage Examples
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>VS Code Settings Example</h6>
-                            <pre class="small bg-light p-2 rounded"><code>{
-  "github.copilot.chat.mcpServers": {
-    "forceweaver": {
-      "command": "python",
-      "args": ["mcp_server/enhanced_server.py"],
-      "env": {
-        "FORCEWEAVER_API_KEY": "your_api_key",
-        "SALESFORCE_ORG_ID": "{{ orgs[0].org_identifier if orgs else 'production' }}"
-      }
-    }
-  }
-}</code></pre>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>AI Agent Queries</h6>
-                            <div class="small">
-                                <p><strong>Example queries to try with your AI agent:</strong></p>
-                                <ul>
-                                    <li>"Check the health of my {{ orgs[0].org_identifier if orgs else 'production' }} Salesforce org"</li>
-                                    <li>"Analyze the sharing model in my Salesforce setup"</li>
-                                    <li>"Run a comprehensive Revenue Cloud health check"</li>
-                                    <li>"Check for data integrity issues in Salesforce"</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Security Notice -->
-    <div class="row mt-4">
-        <div class="col">
-            <div class="alert alert-warning">
-                <h6><i class="bi bi-shield-exclamation"></i> Security & Privacy</h6>
-                <ul class="mb-0">
-                    <li>Client secrets are encrypted before storage using industry-standard encryption</li>
-                    <li>ForceWeaver only accesses your Salesforce data to perform requested health checks</li>
-                    <li>No Salesforce data is stored permanently - only temporary access for analysis</li>
-                    <li>You can disconnect orgs at any time to revoke access</li>
-                    <li>All API calls are logged for usage tracking and billing purposes</li>
-                </ul>
-            </div>
-        </div>
-    </div>
 </div>
+
+<script>
+// Handle org type radio button changes
+document.addEventListener('DOMContentLoaded', function() {
+    const orgTypeRadios = document.querySelectorAll('input[name="org_type"]');
+    const isSandboxInput = document.getElementById('is_sandbox');
+    
+    orgTypeRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            isSandboxInput.value = this.value === 'sandbox' ? 'true' : 'false';
+        });
+    });
+});
+</script>
 {% endblock %} 

@@ -52,13 +52,14 @@ def create_app():
     from app.models import user, api_key, salesforce_org, usage_log, rate_configuration
     
     # Register blueprints
-    from app.web import auth_routes, dashboard_routes, main_routes
-    from app.api.v1 import auth_api, keys_api, orgs_api, usage_api, internal_api
+    from app.web.main_routes import bp as main_bp
+    app.register_blueprint(main_bp)
     
-    # Web routes (HTML responses)
-    app.register_blueprint(main_routes.bp)
-    app.register_blueprint(auth_routes.bp, url_prefix='/auth')
-    app.register_blueprint(dashboard_routes.bp, url_prefix='/dashboard')
+    from app.web.auth_routes import bp as auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    
+    from app.web.dashboard_routes import bp as dashboard_bp
+    app.register_blueprint(dashboard_bp)
     
     # API routes (JSON responses)
     app.register_blueprint(auth_api.bp, url_prefix='/api/v1.0/auth')
