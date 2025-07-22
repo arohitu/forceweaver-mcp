@@ -89,6 +89,11 @@ def create_app():
     # Import models to ensure they're registered with SQLAlchemy
     from app.models import user, api_key, salesforce_org, usage_log, rate_configuration
 
+    # Template context processor to provide current_user to all templates
+    @app.context_processor
+    def inject_user():
+        return dict(current_user=get_current_user())
+
     # Register blueprints
     from app.web.main_routes import bp as main_bp
     app.register_blueprint(main_bp)

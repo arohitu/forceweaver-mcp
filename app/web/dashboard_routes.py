@@ -24,11 +24,14 @@ def index():
     
     current_app.logger.info(f"Dashboard accessed by user: {user.email}")
     
-    # Get user statistics
+    # Get user data
     try:
-        api_keys_count = APIKey.query.filter_by(user_id=user.id, is_active=True).count()
-        orgs_count = SalesforceOrg.query.filter_by(user_id=user.id, is_active=True).count()
-        usage_count = UsageLog.query.filter_by(user_id=user.id).count()
+        # Get API keys
+        api_keys = APIKey.query.filter_by(user_id=user.id).order_by(APIKey.created_at.desc()).all()
+        active_api_keys = [key for key in api_keys if key.is_active]
+        
+        # Get Salesforce orgs  
+        orgs = SalesforceOrg.query.filter_by(user_id=user.id, is_active=True).order_by(SalesforceOrg.created_at.desc()).all()
         
         # Get recent usage
         recent_usage = UsageLog.query.filter_by(user_id=user.id)\
@@ -36,10 +39,25 @@ def index():
             .limit(5)\
             .all()
         
+        # Calculate monthly stats
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        monthly_usage = UsageLog.query.filter_by(user_id=user.id)\
+            .filter(UsageLog.created_at >= month_start)\
+            .all()
+        
+        monthly_stats = {
+            'total_calls': len(monthly_usage),
+            'total_cost_dollars': sum(log.cost_cents for log in monthly_usage) / 100.0
+        }
+        
+        # Basic stats for backwards compatibility
         stats = {
-            'api_keys': api_keys_count,
-            'orgs': orgs_count,
-            'total_calls': usage_count,
+            'api_keys': len(active_api_keys),
+            'orgs': len(orgs),
+            'total_calls': len(UsageLog.query.filter_by(user_id=user.id).all()),
             'recent_usage': recent_usage
         }
         
@@ -47,6 +65,13 @@ def index():
         
     except Exception as e:
         current_app.logger.error(f"Error getting dashboard stats: {e}")
+        api_keys = []
+        orgs = []
+        recent_usage = []
+        monthly_stats = {
+            'total_calls': 0,
+            'total_cost_dollars': 0.0
+        }
         stats = {
             'api_keys': 0,
             'orgs': 0,
@@ -54,7 +79,13 @@ def index():
             'recent_usage': []
         }
     
-    return render_template('dashboard/index.html', user=user, stats=stats)
+    return render_template('dashboard/index.html', 
+                         user=user, 
+                         stats=stats,
+                         api_keys=api_keys,
+                         orgs=orgs,
+                         recent_usage=recent_usage,
+                         monthly_stats=monthly_stats)
 
 @bp.route('/keys')
 @login_required
@@ -69,7 +100,7 @@ def keys():
     # Get user's API keys
     user_keys = APIKey.query.filter_by(user_id=user.id).order_by(APIKey.created_at.desc()).all()
     
-    return render_template('dashboard/api_keys.html', user=user, api_keys=user_keys)
+    return render_template('dashboard/keys.html', user=user, api_keys=user_keys)
 
 @bp.route('/keys/create', methods=['POST'])
 @login_required
@@ -154,7 +185,7 @@ def orgs():
         .order_by(SalesforceOrg.created_at.desc())\
         .all()
     
-    return render_template('dashboard/salesforce.html', user=user, orgs=user_orgs)
+    return render_template('dashboard/orgs.html', user=user, orgs=user_orgs)
 
 @bp.route('/orgs/create', methods=['POST'])
 @login_required
