@@ -212,7 +212,7 @@ def get_available_tools():
         "tools": tools,
         "capabilities": {
             "tools": {
-                "listChanged": False
+                "listChanged": false
             }
         }
     })
