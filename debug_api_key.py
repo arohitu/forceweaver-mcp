@@ -27,7 +27,7 @@ def debug_api_key(api_key_value):
         print(f"🔍 Looking for API key hash: {key_hash}")
         
         # Find the API key record
-        api_key_record = APIKey.query.filter_by(key_hash=key_hash).first()
+        api_key_record = APIKey.query.filter_by(hashed_key=key_hash).first()
         
         if not api_key_record:
             print("❌ API key not found in database!")
