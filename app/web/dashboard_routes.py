@@ -164,25 +164,47 @@ def salesforce():
     api_version_form = None
     
     if connection:
-        # Always fetch fresh API versions when page loads (force update for dashboard display)
-        try:
-            current_app.logger.info("Fetching latest API versions for dashboard display")
-            available_versions = update_connection_api_versions(connection, force_update=True)
-            current_app.logger.info(f"Retrieved {len(available_versions)} API versions")
-        except Exception as e:
-            current_app.logger.error(f"Error updating API versions: {e}")
-            available_versions = connection.available_versions_list or []
+        current_app.logger.info(f"Salesforce connection found for customer {customer.id}")
+        current_app.logger.info(f"Connection org: {connection.salesforce_org_id}")
+        current_app.logger.info(f"Current preferred version: {connection.preferred_api_version}")
+        current_app.logger.info(f"Available versions: {connection.available_versions_list}")
         
-        # Create API version form with the connection object (includes labels)
-        if available_versions:
+        # Always try to fetch fresh API versions when page loads
+        available_versions = []
+        try:
+            current_app.logger.info("Attempting to fetch latest API versions for dashboard display")
+            available_versions = update_connection_api_versions(connection, force_update=True)
+            current_app.logger.info(f"Successfully retrieved {len(available_versions)} API versions: {available_versions}")
+        except Exception as e:
+            current_app.logger.error(f"Error updating API versions: {str(e)}")
+            # Try to use cached versions
+            try:
+                available_versions = connection.available_versions_list or []
+                current_app.logger.info(f"Using cached versions: {available_versions}")
+            except Exception as cache_error:
+                current_app.logger.error(f"Error getting cached versions: {cache_error}")
+                available_versions = []
+        
+        # Always create the API version form, even if versions are empty
+        try:
+            current_app.logger.info("Creating API version form")
             api_version_form = APIVersionForm(connection=connection)
-            # Set current value
-            if connection.preferred_api_version:
-                api_version_form.api_version.data = connection.preferred_api_version
-            elif available_versions:
-                # Default to latest version
-                api_version_form.api_version.data = available_versions[0]
-                current_app.logger.info(f"Defaulting to latest API version: {available_versions[0]}")
+            
+            # If we have versions, set the current selection
+            if available_versions:
+                if connection.preferred_api_version and connection.preferred_api_version in available_versions:
+                    api_version_form.api_version.data = connection.preferred_api_version
+                    current_app.logger.info(f"Set form to preferred version: {connection.preferred_api_version}")
+                else:
+                    # Default to latest version
+                    api_version_form.api_version.data = available_versions[0]
+                    current_app.logger.info(f"Set form to latest version: {available_versions[0]}")
+            else:
+                current_app.logger.warning("No available versions found, form will be empty")
+                
+        except Exception as form_error:
+            current_app.logger.error(f"Error creating API version form: {form_error}")
+            api_version_form = None
     
     return render_template('dashboard/salesforce.html', 
                          customer=customer, 

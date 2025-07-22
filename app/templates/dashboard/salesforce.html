@@ -56,16 +56,21 @@
                 </h5>
             </div>
             <div class="card-body">
-                {% if api_version_form %}
-                    <div class="row">
-                        <div class="col-md-8">
-                            <p class="text-muted">
-                                Choose which Salesforce API version to use for health checks and data operations.
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="text-muted">
+                            Choose which Salesforce API version to use for health checks and data operations.
+                            {% if connection.available_versions_list %}
                                 {% set current_version = connection.get_effective_api_version() %}
                                 {% set current_label = connection.get_version_label(current_version) %}
                                 <strong>{{ current_version }} ({{ current_label }})</strong> is currently being used.
-                            </p>
-                            
+                            {% else %}
+                                Currently using <strong>{{ connection.get_effective_api_version() }}</strong>.
+                            {% endif %}
+                        </p>
+                        
+                        {% if api_version_form and api_version_form.api_version.choices %}
+                            <!-- API Version Selection Form -->
                             <form method="POST" action="{{ url_for('dashboard.update_api_version') }}">
                                 {{ api_version_form.hidden_tag() }}
                                 
@@ -76,9 +81,19 @@
                                     <div class="form-text">
                                         <strong>Current:</strong> 
                                         {% if connection.preferred_api_version %}
-                                            {{ connection.preferred_api_version }} ({{ connection.get_version_label(connection.preferred_api_version) }}) - User Selected
+                                            {{ connection.preferred_api_version }} 
+                                            {% if connection.available_versions_list %}
+                                                ({{ connection.get_version_label(connection.preferred_api_version) }}) - User Selected
+                                            {% else %}
+                                                - User Selected
+                                            {% endif %}
                                         {% else %}
-                                            {{ connection.get_effective_api_version() }} ({{ connection.get_version_label(connection.get_effective_api_version()) }}) - Latest Available
+                                            {{ connection.get_effective_api_version() }} 
+                                            {% if connection.available_versions_list %}
+                                                ({{ connection.get_version_label(connection.get_effective_api_version()) }}) - Latest Available
+                                            {% else %}
+                                                - Default Version
+                                            {% endif %}
                                         {% endif %}
                                         {% if connection.api_versions_last_updated %}
                                             <br><strong>Last Updated:</strong> {{ connection.api_versions_last_updated.strftime('%B %d, %Y at %I:%M %p') }}
@@ -95,64 +110,71 @@
                                     </button>
                                 </div>
                             </form>
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <h6 class="card-title">Available Versions</h6>
-                                    {% if connection.available_versions_list %}
-                                        <div class="small">
-                                            <strong>Latest 5 versions:</strong>
-                                            <ul class="list-unstyled mt-2">
-                                            {% for version in connection.available_versions_list[:5] %}
-                                                <li class="mb-1">
-                                                    <span class="badge bg-{{ 'primary' if version == connection.preferred_api_version else 'secondary' }} text-xs">
-                                                        {{ version }}
-                                                    </span>
-                                                    <small class="text-muted">{{ connection.get_version_label(version) }}</small>
-                                                    {% if version == connection.preferred_api_version %}
-                                                        <small class="text-success fw-bold">(current)</small>
-                                                    {% elif loop.first %}
-                                                        <small class="text-info">(latest)</small>
-                                                    {% endif %}
-                                                </li>
-                                            {% endfor %}
-                                            </ul>
-                                            
-                                            {% if connection.available_versions_list|length > 5 %}
-                                                <small class="text-muted">
-                                                    ...and {{ connection.available_versions_list|length - 5 }} more versions available
-                                                </small>
-                                            {% endif %}
-                                        </div>
-                                    {% else %}
-                                        <p class="small text-muted">No versions loaded. Click "Refresh Versions" to load available API versions from your Salesforce org.</p>
-                                    {% endif %}
-                                    
-                                    <div class="mt-2">
-                                        <small class="text-muted">
-                                            {% if connection.api_versions_last_updated %}
-                                                Last updated: {{ connection.api_versions_last_updated.strftime('%I:%M %p') }}
-                                            {% else %}
-                                                Not yet loaded
-                                            {% endif %}
-                                        </small>
+                        {% else %}
+                            <!-- No API versions loaded yet -->
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Loading API Versions...</strong>
+                                <p class="mb-2">We're fetching the available Salesforce API versions from your org. This may take a moment.</p>
+                                <button type="button" class="btn btn-primary" onclick="refreshVersions()">
+                                    <i class="bi bi-arrow-clockwise"></i> Load Available Versions
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Available Versions</h6>
+                                {% if connection.available_versions_list %}
+                                    <div class="small">
+                                        <strong>Latest 5 versions:</strong>
+                                        <ul class="list-unstyled mt-2">
+                                        {% for version in connection.available_versions_list[:5] %}
+                                            <li class="mb-1">
+                                                <span class="badge bg-{{ 'primary' if version == connection.preferred_api_version else 'secondary' }} text-xs">
+                                                    {{ version }}
+                                                </span>
+                                                <small class="text-muted">{{ connection.get_version_label(version) }}</small>
+                                                {% if version == connection.preferred_api_version %}
+                                                    <small class="text-success fw-bold">(current)</small>
+                                                {% elif loop.first %}
+                                                    <small class="text-info">(latest)</small>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                        </ul>
+                                        
+                                        {% if connection.available_versions_list|length > 5 %}
+                                            <small class="text-muted">
+                                                ...and {{ connection.available_versions_list|length - 5 }} more versions available
+                                            </small>
+                                        {% endif %}
                                     </div>
+                                {% else %}
+                                    <p class="small text-muted">
+                                        <i class="bi bi-clock"></i> Loading versions from your Salesforce org...
+                                        <br><br>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshVersions()">
+                                            <i class="bi bi-arrow-clockwise"></i> Load Now
+                                        </button>
+                                    </p>
+                                {% endif %}
+                                
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        {% if connection.api_versions_last_updated %}
+                                            Last updated: {{ connection.api_versions_last_updated.strftime('%I:%M %p') }}
+                                        {% else %}
+                                            Not yet loaded
+                                        {% endif %}
+                                    </small>
                                 </div>
                             </div>
                         </div>
                     </div>
-                {% else %}
-                    <div class="row">
-                        <div class="col-12">
-                            <p class="text-muted">Loading available API versions from your Salesforce org...</p>
-                            <button type="button" class="btn btn-primary" onclick="refreshVersions()">
-                                <i class="bi bi-arrow-clockwise"></i> Load Available Versions
-                            </button>
-                        </div>
-                    </div>
-                {% endif %}
+                </div>
             </div>
         </div>
     </div>

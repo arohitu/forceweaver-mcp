@@ -142,8 +142,8 @@ class SalesforceConnection(db.Model):
         if versions:
             return versions[0]  # Assuming versions are sorted newest first
         
-        # Fallback to a reasonable default
-        return "v59.0"
+        # Fallback to a more recent default version
+        return "v61.0"  # Summer '24 - more recent than v52.0
 
 class HealthCheckHistory(db.Model):
     """Historical health check results for dashboard display"""
