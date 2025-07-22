@@ -56,40 +56,85 @@ def register():
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     """User login"""
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        
-        current_app.logger.info(f"Login attempt for email: {email}")
-        
-        if not email or not password:
-            flash('Email and password are required.', 'error')
-            return render_template('auth/login.html')
-        
-        user = User.query.filter_by(email=email).first()
-        current_app.logger.info(f"User found: {bool(user)}")
-        
-        if user and user.check_password(password):
-            current_app.logger.info(f"Password check passed for user: {user.email}")
-            if user.is_active:
-                current_app.logger.info("User is active, attempting login_user")
-                current_app.logger.info(f"Before login_user - session: {dict(session)}")
-                login_user(user)
-                current_app.logger.info(f"After login_user - session: {dict(session)}")
-                current_app.logger.info(f"login_user completed, current_user authenticated: {current_user.is_authenticated if current_user else 'No current_user'}")
-                
-                next_page = request.args.get('next')
-                if not next_page or not next_page.startswith('/'):
-                    next_page = url_for('dashboard.index')
-                current_app.logger.info(f"Redirecting to: {next_page}")
-                return redirect(next_page)
-            else:
-                current_app.logger.warning(f"User {user.email} is not active")
-                flash('Your account has been deactivated. Please contact support.', 'error')
-        else:
-            current_app.logger.warning(f"Authentication failed for email: {email}")
-            flash('Invalid email or password.', 'error')
+    current_app.logger.info(f"=== LOGIN REQUEST START === Method: {request.method}")
+    current_app.logger.info(f"Request URL: {request.url}")
+    current_app.logger.info(f"Request args: {dict(request.args)}")
+    current_app.logger.info(f"Request headers: {dict(request.headers)}")
     
+    if request.method == 'POST':
+        current_app.logger.info("=== POST LOGIN PROCESSING ===")
+        current_app.logger.info(f"Form data keys: {list(request.form.keys())}")
+        current_app.logger.info(f"Form data (without password): {dict((k, v) for k, v in request.form.items() if k != 'password')}")
+        
+        try:
+            email = request.form.get('email', '').strip().lower()
+            password = request.form.get('password', '')
+            
+            current_app.logger.info(f"Login attempt for email: {email}")
+            current_app.logger.info(f"Password provided: {bool(password)}")
+            current_app.logger.info(f"Session before processing: {dict(session)}")
+            
+            if not email or not password:
+                current_app.logger.warning("Missing email or password")
+                flash('Email and password are required.', 'error')
+                return render_template('auth/login.html')
+            
+            current_app.logger.info("Querying database for user...")
+            user = User.query.filter_by(email=email).first()
+            current_app.logger.info(f"User found: {bool(user)}")
+            
+            if user:
+                current_app.logger.info(f"User details: ID={user.id}, Email={user.email}, Active={user.is_active}")
+                current_app.logger.info("Checking password...")
+                password_valid = user.check_password(password)
+                current_app.logger.info(f"Password check result: {password_valid}")
+                
+                if password_valid:
+                    current_app.logger.info(f"Password check passed for user: {user.email}")
+                    if user.is_active:
+                        current_app.logger.info("User is active, attempting login_user")
+                        current_app.logger.info(f"Before login_user - session: {dict(session)}")
+                        
+                        try:
+                            login_user(user)
+                            current_app.logger.info("login_user() call completed successfully")
+                            current_app.logger.info(f"After login_user - session: {dict(session)}")
+                            current_app.logger.info(f"current_user authenticated: {current_user.is_authenticated if current_user else 'No current_user'}")
+                            current_app.logger.info(f"current_user object: {current_user}")
+                            
+                            next_page = request.args.get('next')
+                            current_app.logger.info(f"Next page from args: {next_page}")
+                            if not next_page or not next_page.startswith('/'):
+                                next_page = url_for('dashboard.index')
+                            current_app.logger.info(f"Final redirect target: {next_page}")
+                            
+                            # Test session persistence before redirect
+                            session['test_key'] = 'test_value'
+                            session.modified = True
+                            current_app.logger.info(f"Session after setting test key: {dict(session)}")
+                            
+                            current_app.logger.info("=== SUCCESSFUL LOGIN - REDIRECTING ===")
+                            return redirect(next_page)
+                        except Exception as e:
+                            current_app.logger.error(f"Error during login_user(): {str(e)}")
+                            current_app.logger.error(f"Exception type: {type(e)}")
+                            flash('Login failed due to system error.', 'error')
+                    else:
+                        current_app.logger.warning(f"User {user.email} is not active")
+                        flash('Your account has been deactivated. Please contact support.', 'error')
+                else:
+                    current_app.logger.warning(f"Password check failed for user: {email}")
+                    flash('Invalid email or password.', 'error')
+            else:
+                current_app.logger.warning(f"No user found for email: {email}")
+                flash('Invalid email or password.', 'error')
+                
+        except Exception as e:
+            current_app.logger.error(f"Unexpected error in login route: {str(e)}")
+            current_app.logger.error(f"Exception type: {type(e)}")
+            flash('An unexpected error occurred during login.', 'error')
+    
+    current_app.logger.info("=== RENDERING LOGIN TEMPLATE ===")
     return render_template('auth/login.html')
 
 @bp.route('/logout')
