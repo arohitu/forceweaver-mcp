@@ -60,7 +60,7 @@ def test_mcp_compliance(base_url="http://localhost:5000", api_key=None):
                 "Content-Type": "application/json"
             }
             
-            # Test with basic parameters
+            # Test with MCP standard format
             payload = {
                 "name": "revenue_cloud_health_check",
                 "arguments": {
@@ -68,13 +68,13 @@ def test_mcp_compliance(base_url="http://localhost:5000", api_key=None):
                 }
             }
             
-            response = requests.post(f"{base_url}/api/mcp/call-tool", 
+            response = requests.post(f"{base_url}/api/mcp/health-check", 
                                    json=payload, headers=headers)
             
             if response.status_code == 200:
                 data = response.json()
                 if "content" in data and not data.get("isError", True):
-                    print("✅ Tool invocation successful")
+                    print("✅ Tool invocation successful (MCP format)")
                     print(f"   Response type: MCP-compliant content format")
                     print(f"   Metadata: {data.get('_meta', {})}")
                 else:
@@ -83,6 +83,25 @@ def test_mcp_compliance(base_url="http://localhost:5000", api_key=None):
             else:
                 print(f"❌ Tool invocation failed: {response.status_code}")
                 print(f"   Response: {response.text}")
+                
+            # Test with direct format for backwards compatibility
+            print("\n   Testing Direct Format...")
+            direct_payload = {
+                "check_types": ["basic_org_info"],
+                "api_version": "v64.0"
+            }
+            
+            response = requests.post(f"{base_url}/api/mcp/health-check", 
+                                   json=direct_payload, headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "content" in data and not data.get("isError", True):
+                    print("✅ Direct format also supported")
+                else:
+                    print("❌ Direct format failed")
+            else:
+                print(f"❌ Direct format failed: {response.status_code}")
                 
         except Exception as e:
             print(f"❌ Error testing tool invocation: {e}")
@@ -116,7 +135,8 @@ def test_mcp_compliance(base_url="http://localhost:5000", api_key=None):
     if api_key:
         print("\n📝 Example AI Agent Usage:")
         print(f"""
-curl -X POST {base_url}/api/mcp/call-tool \\
+# MCP Standard Format:
+curl -X POST {base_url}/api/mcp/health-check \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{{
@@ -125,6 +145,15 @@ curl -X POST {base_url}/api/mcp/call-tool \\
       "check_types": ["basic_org_info", "sharing_model"],
       "api_version": "v64.0"
     }}
+  }}'
+
+# Direct Format (for simplicity):
+curl -X POST {base_url}/api/mcp/health-check \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{{
+    "check_types": ["basic_org_info", "sharing_model"],
+    "api_version": "v64.0"
   }}'
         """)
 

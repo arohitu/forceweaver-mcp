@@ -77,7 +77,7 @@ The root endpoint identifies this as an MCP-compliant server:
 
 ### 2. Tool Invocation
 
-**Endpoint**: `POST https://api.forceweaver.com/api/mcp/call-tool`
+**Endpoint**: `POST https://api.forceweaver.com/api/mcp/health-check`
 
 **Headers**:
 ```
@@ -85,7 +85,7 @@ Authorization: Bearer YOUR_API_KEY
 Content-Type: application/json
 ```
 
-**Request Format**:
+#### Option A: MCP Standard Format (Recommended for AI Agents)
 ```json
 {
   "name": "revenue_cloud_health_check",
@@ -96,7 +96,15 @@ Content-Type: application/json
 }
 ```
 
-**Response Format** (MCP-compliant):
+#### Option B: Direct Format (Simplified)
+```json
+{
+  "check_types": ["basic_org_info", "sharing_model"],
+  "api_version": "v64.0"
+}
+```
+
+**Response Format** (MCP-compliant for both formats):
 ```json
 {
   "content": [
@@ -137,13 +145,13 @@ Content-Type: application/json
 
 ## 🤖 AI Agent Implementation Examples
 
-### Example 1: Basic Health Check
+### Example 1: MCP Standard Format (Recommended)
 
 ```python
 import requests
 
-def run_salesforce_health_check(api_key, org_type="full"):
-    """Run a Salesforce health check for an AI agent."""
+def run_salesforce_health_check_mcp(api_key, org_type="full"):
+    """Run a Salesforce health check using MCP format for AI agents."""
     
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -167,7 +175,7 @@ def run_salesforce_health_check(api_key, org_type="full"):
         payload["arguments"]["check_types"] = checks
     
     response = requests.post(
-        "https://api.forceweaver.com/api/mcp/call-tool",
+        "https://api.forceweaver.com/api/mcp/health-check",
         json=payload,
         headers=headers
     )
@@ -184,21 +192,31 @@ def run_salesforce_health_check(api_key, org_type="full"):
     return {"success": False, "error": response.text}
 ```
 
-### Example 2: API Version Specific Check
+### Example 2: Direct Format (Simplified)
 
 ```python
-def check_with_specific_api_version(api_key, api_version="v64.0"):
-    """Run health check with specific Salesforce API version."""
+def run_salesforce_health_check_direct(api_key, check_types=None, api_version=None):
+    """Run health check with direct parameter format."""
     
-    payload = {
-        "name": "revenue_cloud_health_check", 
-        "arguments": {
-            "api_version": api_version,
-            "check_types": ["basic_org_info", "sharing_model"]
-        }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
     }
     
-    # ... rest of implementation
+    payload = {}
+    
+    if check_types:
+        payload["check_types"] = check_types
+    if api_version:
+        payload["api_version"] = api_version
+    
+    response = requests.post(
+        "https://api.forceweaver.com/api/mcp/health-check",
+        json=payload,
+        headers=headers
+    )
+    
+    return response.json() if response.status_code == 200 else {"error": response.text}
 ```
 
 ### Example 3: Error Handling
@@ -221,8 +239,8 @@ def robust_health_check(api_key):
         if not status.get("salesforce_connected"):
             return {"error": "No Salesforce connection found. User needs to authenticate."}
         
-        # Run the health check
-        result = run_salesforce_health_check(api_key)
+        # Run the health check using MCP format
+        result = run_salesforce_health_check_mcp(api_key)
         return result
         
     except requests.RequestException as e:
@@ -248,31 +266,32 @@ Use this to verify service availability before running health checks:
 
 ## ⚠️ Error Handling
 
-### Common Error Responses:
+### Common Error Responses (MCP Format):
 
 **Authentication Error (401)**:
 ```json
-{"error": "API key is required", "error_type": "Unauthorized"}
+{
+  "content": [{"type": "text", "text": "❌ API key is required"}],
+  "isError": true,
+  "error_type": "Unauthorized"
+}
 ```
 
 **Tool Not Found (404)**:
 ```json
-{"error": "Unknown tool: invalid_tool_name", "error_type": "ToolNotFound"}
+{
+  "content": [{"type": "text", "text": "❌ Unknown tool: invalid_tool_name. Only 'revenue_cloud_health_check' is supported."}],
+  "isError": true,
+  "error_type": "ToolNotFound"
+}
 ```
 
 **Invalid Arguments (400)**:
 ```json
 {
-  "error": "Invalid check types: invalid_type. Valid types: basic_org_info, sharing_model, bundle_analysis, attribute_integrity",
+  "content": [{"type": "text", "text": "❌ Invalid check types: invalid_type. Valid types: basic_org_info, sharing_model, bundle_analysis, attribute_integrity"}],
+  "isError": true,
   "error_type": "InvalidArgument"
-}
-```
-
-**Configuration Error (400)**:
-```json
-{
-  "error": "No Salesforce connection found for this customer.",
-  "error_type": "ConfigurationError"
 }
 ```
 
@@ -287,7 +306,7 @@ Use this to verify service availability before running health checks:
 2. **Service Discovery**: Check MCP capabilities at root endpoint
 3. **Tool Discovery**: Get available tools via `/api/mcp/tools`
 4. **Status Check**: Verify Salesforce connection via `/api/mcp/status`
-5. **Tool Invocation**: Call tools via `/api/mcp/call-tool`
+5. **Tool Invocation**: Call health check via `/api/mcp/health-check`
 6. **Result Processing**: Parse MCP-compliant content responses
 
 ## 🔐 Security Considerations

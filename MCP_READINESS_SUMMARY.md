@@ -17,8 +17,8 @@ Your ForceWeaver MCP API is now **fully compliant** with the Model Context Proto
 - **Tool descriptions** and parameter documentation
 
 ### **3. Tool Invocation** ✅
-- **`POST /api/mcp/call-tool`** endpoint for AI agents
-- **MCP-compliant request/response format**
+- **`POST /api/mcp/health-check`** endpoint accepts both MCP format and direct format
+- **MCP-compliant request/response format** for all responses
 - **Parameter validation** against tool schema
 - **Error handling** with structured error types
 
@@ -56,15 +56,14 @@ Your ForceWeaver MCP API is now **fully compliant** with the Model Context Proto
 |----------|--------|---------|----------------|
 | `/` | GET | MCP server discovery | None |
 | `/api/mcp/tools` | GET | Tool discovery | None |
-| `/api/mcp/call-tool` | POST | **Tool invocation** | ✅ Required |
+| `/api/mcp/health-check` | POST | **Tool invocation (MCP + Direct)** | ✅ Required |
 | `/api/mcp/status` | GET | Service status | ✅ Required |
-| `/api/mcp/health-check` | POST | Legacy endpoint | ✅ Required |
 
 ## 🔧 **Example AI Agent Usage**
 
-### **Tool Invocation Example**:
+### **MCP Standard Format** (Recommended for AI Agents):
 ```bash
-curl -X POST https://api.forceweaver.com/api/mcp/call-tool \
+curl -X POST https://api.forceweaver.com/api/mcp/health-check \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -76,7 +75,18 @@ curl -X POST https://api.forceweaver.com/api/mcp/call-tool \
   }'
 ```
 
-### **Expected Response**:
+### **Direct Format** (Simplified):
+```bash
+curl -X POST https://api.forceweaver.com/api/mcp/health-check \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "check_types": ["basic_org_info", "sharing_model"],
+    "api_version": "v64.0"
+  }'
+```
+
+### **Expected Response** (MCP Format for both):
 ```json
 {
   "content": [
@@ -99,6 +109,7 @@ curl -X POST https://api.forceweaver.com/api/mcp/call-tool \
 - ✅ **Code Ready**: All MCP components implemented
 - ✅ **Testing Tools**: `test_mcp_compliance.py` created
 - ✅ **Documentation**: Complete AI agent guide created
+- ✅ **Simplified Design**: Single endpoint with dual format support
 - ⏳ **Deployment**: New code needs to be deployed to production
 
 **Next Step**: Deploy the updated code to activate full MCP compliance.
@@ -121,19 +132,34 @@ Expected result: **100% MCP compliance** ✅
 ## 🌟 **Key Achievements**
 
 1. **Full MCP Compliance**: Follows official MCP v2025-03-26 specification
-2. **Backwards Compatibility**: Legacy endpoints still work
+2. **Simplified Design**: Single endpoint supporting both MCP and direct formats
 3. **Enhanced Tool Schema**: Detailed parameter validation and descriptions
 4. **AI-Friendly Responses**: Structured, machine-readable output format
 5. **Production Ready**: Robust error handling and authentication
+6. **No Redundancy**: Streamlined architecture without duplicate endpoints
+
+## 🎯 **Design Benefits**
+
+### **Why Single Endpoint is Better:**
+- ✅ **Simpler for AI Agents**: Only one endpoint to remember
+- ✅ **Flexible Input**: Supports both MCP standard and direct formats
+- ✅ **Consistent Output**: Always returns MCP-compliant responses
+- ✅ **No Confusion**: Clear, singular tool invocation path
+- ✅ **Easier Maintenance**: Single codebase for tool logic
+
+### **Dual Format Support:**
+- **MCP Format**: `{"name": "revenue_cloud_health_check", "arguments": {...}}`
+- **Direct Format**: `{"check_types": [...], "api_version": "..."}`
+- **Same Response**: Both formats return MCP-compliant responses
 
 ---
 
 ## 🎉 **Conclusion**
 
-Your **ForceWeaver MCP API is now ready for AI agent integration**. AI agents can:
+Your **ForceWeaver MCP API is now ready for AI agent integration** with an optimal, simplified design. AI agents can:
 - ✅ Discover your service as MCP-compliant
 - ✅ Find available tools automatically
-- ✅ Invoke health checks with custom parameters
-- ✅ Receive structured, actionable results
+- ✅ Invoke health checks using either MCP format or direct format
+- ✅ Receive structured, actionable results in MCP format
 
-**The API is production-ready and will work seamlessly with any MCP-compliant AI system!** 
+**The API is production-ready and will work seamlessly with any MCP-compliant AI system, while also being simple enough for direct integration!** 

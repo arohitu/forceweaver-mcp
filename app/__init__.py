@@ -143,10 +143,9 @@ def create_app(config_class=Config):
             },
             "endpoints": {
                 "tools": "/api/mcp/tools",
-                "call_tool": "/api/mcp/call-tool", 
+                "health_check": "/api/mcp/health-check", 
                 "status": "/api/mcp/status",
-                "auth": "/api/auth/salesforce/initiate?email=<your-email>",
-                "legacy_health_check": "/api/mcp/health-check"
+                "auth": "/api/auth/salesforce/initiate?email=<your-email>"
             },
             "tools": [
                 {
@@ -158,7 +157,7 @@ def create_app(config_class=Config):
                 "auth_flow": "1. Navigate to /api/auth/salesforce/initiate?email=<your-email> to start OAuth flow",
                 "api_usage": "Use the returned API key as 'Authorization: Bearer <api_key>' header",
                 "mcp_compliance": "This API follows MCP (Model Context Protocol) standards for AI agent integration",
-                "tool_invocation": "POST /api/mcp/call-tool with JSON body: {'name': 'tool_name', 'arguments': {...}}"
+                "tool_invocation": "POST /api/mcp/health-check with JSON body: {'name': 'revenue_cloud_health_check', 'arguments': {...}} or direct format: {'check_types': [...], 'api_version': '...'}"
             }
         }
     

@@ -10,52 +10,42 @@ mcp_bp = Blueprint('mcp', __name__)
 
 # Debug endpoint removed for production security
 
-@mcp_bp.route('/call-tool', methods=['POST'])
+@mcp_bp.route('/health-check', methods=['POST'])
 @require_api_key
-def call_tool():
-    """MCP-compliant tool invocation endpoint for AI agents."""
+def perform_health_check():
+    """MCP-compliant health check endpoint for AI agents."""
     try:
         # Parse the MCP tool call request
         data = request.get_json()
         if not data:
             return jsonify({
-                "error": "Request body must be valid JSON",
+                "content": [{"type": "text", "text": "❌ Request body must be valid JSON"}],
+                "isError": True,
                 "error_type": "InvalidRequest"
             }), 400
         
-        tool_name = data.get('name')
-        arguments = data.get('arguments', {})
-        
-        if not tool_name:
-            return jsonify({
-                "error": "Tool name is required",
-                "error_type": "InvalidRequest"
-            }), 400
-        
-        # Route to the appropriate tool handler
-        if tool_name == 'revenue_cloud_health_check':
-            return handle_health_check_tool(arguments)
+        # Handle both MCP format and legacy format for flexibility
+        if 'name' in data:
+            # MCP format: {"name": "revenue_cloud_health_check", "arguments": {...}}
+            tool_name = data.get('name')
+            arguments = data.get('arguments', {})
+            
+            if tool_name != 'revenue_cloud_health_check':
+                return jsonify({
+                    "content": [{"type": "text", "text": f"❌ Unknown tool: {tool_name}. Only 'revenue_cloud_health_check' is supported."}],
+                    "isError": True,
+                    "error_type": "ToolNotFound"
+                }), 404
         else:
-            return jsonify({
-                "error": f"Unknown tool: {tool_name}",
-                "error_type": "ToolNotFound"
-            }), 404
-    
-    except Exception as e:
-        logging.getLogger(__name__).error(f"Tool call failed: {str(e)}", exc_info=True)
-        return jsonify({
-            "error": f"Tool execution failed: {str(e)}",
-            "error_type": "ToolExecutionError"
-        }), 500
-
-def handle_health_check_tool(arguments):
-    """Handle the revenue_cloud_health_check tool with MCP parameters."""
-    try:
+            # Legacy/Direct format: {"check_types": [...], "api_version": "..."}
+            arguments = data
+        
         # g.customer is attached by the decorator
         connection = g.customer.salesforce_connection
         if not connection:
             return jsonify({
-                "error": "No Salesforce connection found for this customer.",
+                "content": [{"type": "text", "text": "❌ No Salesforce connection found for this customer."}],
+                "isError": True,
                 "error_type": "ConfigurationError"
             }), 400
 
@@ -75,7 +65,8 @@ def handle_health_check_tool(arguments):
             invalid_types = [ct for ct in check_types if ct not in valid_check_types]
             if invalid_types:
                 return jsonify({
-                    "error": f"Invalid check types: {', '.join(invalid_types)}. Valid types: {', '.join(valid_check_types)}",
+                    "content": [{"type": "text", "text": f"❌ Invalid check types: {', '.join(invalid_types)}. Valid types: {', '.join(valid_check_types)}"}],
+                    "isError": True,
                     "error_type": "InvalidArgument"
                 }), 400
 
@@ -92,7 +83,8 @@ def handle_health_check_tool(arguments):
             available_versions = connection.available_versions_list
             if available_versions and api_version not in available_versions:
                 return jsonify({
-                    "error": f"API version {api_version} not available. Available versions: {', '.join(available_versions[:5])}",
+                    "content": [{"type": "text", "text": f"❌ API version {api_version} not available. Available versions: {', '.join(available_versions[:5])}"}],
+                    "isError": True,
                     "error_type": "InvalidArgument"
                 }), 400
             effective_api_version = api_version
@@ -122,6 +114,7 @@ def handle_health_check_tool(arguments):
             # Run all checks (default behavior)
             results = checker.run_all_checks()
 
+        # Return MCP-compliant response
         return jsonify({
             "content": [
                 {
@@ -143,7 +136,7 @@ def handle_health_check_tool(arguments):
         })
     
     except Exception as e:
-        logging.getLogger(__name__).error(f"Health check tool failed: {str(e)}", exc_info=True)
+        logging.getLogger(__name__).error(f"Health check failed: {str(e)}", exc_info=True)
         return jsonify({
             "content": [
                 {
@@ -156,55 +149,6 @@ def handle_health_check_tool(arguments):
                 "error_type": type(e).__name__
             }
         })
-
-@mcp_bp.route('/health-check', methods=['POST'])
-@require_api_key
-def perform_health_check():
-    """Legacy health check endpoint - redirects to MCP tool invocation."""
-    try:
-        # For backwards compatibility, convert to MCP tool call format
-        data = request.get_json() or {}
-        
-        tool_call = {
-            "name": "revenue_cloud_health_check",
-            "arguments": {
-                "check_types": data.get('check_types', []),
-                "api_version": data.get('api_version')
-            }
-        }
-        
-        # Remove empty arguments
-        tool_call["arguments"] = {k: v for k, v in tool_call["arguments"].items() if v}
-        
-        result = handle_health_check_tool(tool_call["arguments"])
-        
-        # Convert MCP response back to legacy format for compatibility
-        if result[1] == 200:  # Success response
-            mcp_response = result[0].get_json()
-            if not mcp_response.get("isError", False):
-                return jsonify({
-                    "success": True,
-                    "customer_id": mcp_response["_meta"]["customer_id"],
-                    "salesforce_org_id": mcp_response["_meta"]["salesforce_org_id"],
-                    "api_version_used": mcp_response["_meta"]["api_version_used"],
-                    "health_check_results": [
-                        {"message": content["text"]} 
-                        for content in mcp_response.get("content", [])
-                        if content["type"] == "text"
-                    ]
-                })
-        
-        # Handle error case
-        return jsonify({
-            "success": False,
-            "error": "Health check failed"
-        }), 500
-    
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Health check failed: {str(e)}"
-        }), 500
 
 @mcp_bp.route('/tools', methods=['GET'])
 def get_available_tools():
