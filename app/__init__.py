@@ -30,7 +30,8 @@ def create_app():
     app.config['FLASK_ENV'] = os.getenv('FLASK_ENV', 'production')
     
     # **Enhanced Flask session configuration for HTTPS**
-    app.config['SESSION_COOKIE_SECURE'] = True  # Only send over HTTPS
+    # Temporarily disable HTTPS-only cookies for debugging
+    app.config['SESSION_COOKIE_SECURE'] = False  # Allow over HTTP for debugging
     app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
     app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours

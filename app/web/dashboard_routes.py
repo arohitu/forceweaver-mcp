@@ -1,7 +1,7 @@
 """
 Dashboard routes for authenticated users
 """
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, session
 from flask_login import login_required, current_user
 from app.models.api_key import APIKey
 from app.models.salesforce_org import SalesforceOrg
@@ -14,6 +14,7 @@ bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 @login_required
 def index():
     """Dashboard home"""
+    current_app.logger.info(f"Dashboard - session received: {dict(session)}")
     current_app.logger.info(f"Dashboard access attempt - current_user: {current_user}")
     current_app.logger.info(f"Dashboard - is_authenticated: {current_user.is_authenticated if current_user else 'No current_user'}")
     current_app.logger.info(f"Dashboard - user ID: {current_user.get_id() if current_user and hasattr(current_user, 'get_id') else 'No ID available'}")

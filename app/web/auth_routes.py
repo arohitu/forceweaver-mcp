@@ -73,7 +73,9 @@ def login():
             current_app.logger.info(f"Password check passed for user: {user.email}")
             if user.is_active:
                 current_app.logger.info("User is active, attempting login_user")
+                current_app.logger.info(f"Before login_user - session: {dict(session)}")
                 login_user(user)
+                current_app.logger.info(f"After login_user - session: {dict(session)}")
                 current_app.logger.info(f"login_user completed, current_user authenticated: {current_user.is_authenticated if current_user else 'No current_user'}")
                 
                 next_page = request.args.get('next')
