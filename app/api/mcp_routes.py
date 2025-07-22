@@ -73,9 +73,15 @@ def test_api_versions():
                 }
                 
                 if version_response.status_code == 200:
-                    version_data = version_response.json()
-                    version_tests[version]["sobjects_url"] = version_data.get("sobjects")
-                    version_tests[version]["query_url"] = version_data.get("query")
+                    try:
+                        version_data = version_response.json()
+                        # Only extract key URLs to avoid serialization issues
+                        version_tests[version]["sobjects_url"] = version_data.get("sobjects", "not_available")
+                        version_tests[version]["query_url"] = version_data.get("query", "not_available")
+                    except Exception as e:
+                        version_tests[version]["parse_error"] = str(e)
+                else:
+                    version_tests[version]["error_text"] = version_response.text[:200]
                     
             results["version_tests"] = version_tests
         else:
@@ -189,9 +195,22 @@ def debug_connection():
                     version_tests['services_data_endpoint'] = {
                         'status': 'success' if services_response.status_code == 200 else 'error',
                         'status_code': services_response.status_code,
-                        'url': services_url,
-                        'response_sample': services_response.json()[:2] if services_response.status_code == 200 else services_response.text[:200]
+                        'url': services_url
                     }
+                    
+                    if services_response.status_code == 200:
+                        try:
+                            services_data = services_response.json()
+                            # Only include first 2 items for brevity and ensure it's serializable
+                            if isinstance(services_data, list) and len(services_data) > 0:
+                                version_tests['services_data_endpoint']['sample_versions'] = [
+                                    {'version': item.get('version', 'unknown'), 'label': item.get('label', 'unknown')} 
+                                    for item in services_data[:2]
+                                ]
+                        except:
+                            version_tests['services_data_endpoint']['response_text'] = services_response.text[:200]
+                    else:
+                        version_tests['services_data_endpoint']['error_text'] = services_response.text[:200]
                     
                     # Test the specific version endpoint
                     version_url = f"{connection.instance_url}/services/data/{test_version}"
@@ -200,14 +219,28 @@ def debug_connection():
                     version_tests['version_endpoint'] = {
                         'status': 'success' if version_response.status_code == 200 else 'error',
                         'status_code': version_response.status_code,
-                        'url': version_url,
-                        'response_sample': version_response.json() if version_response.status_code == 200 else version_response.text[:200]
+                        'url': version_url
                     }
+                    
+                    if version_response.status_code == 200:
+                        try:
+                            version_data = version_response.json()
+                            # Extract only key information to avoid serialization issues
+                            version_tests['version_endpoint']['available_resources'] = {
+                                'sobjects': version_data.get("sobjects", "not_available"),
+                                'query': version_data.get("query", "not_available"),
+                                'search': version_data.get("search", "not_available")
+                            }
+                        except:
+                            version_tests['version_endpoint']['response_text'] = version_response.text[:200]
+                    else:
+                        version_tests['version_endpoint']['error_text'] = version_response.text[:200]
                     
                 except Exception as e:
                     version_tests['direct_api_test'] = {
                         'status': 'error',
-                        'error': str(e)
+                        'error': str(e),
+                        'error_type': type(e).__name__
                     }
                 
                 debug_results["api_tests"][test_version] = {
