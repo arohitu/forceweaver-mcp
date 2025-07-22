@@ -11,6 +11,9 @@ Werkzeug==2.3.7
 # Database
 psycopg2-binary==2.9.7
 
+# Authentication & Security
+bcrypt==4.0.1
+
 # MCP Protocol (using latest available version)
 mcp>=1.12.0
 
