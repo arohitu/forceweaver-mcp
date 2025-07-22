@@ -21,24 +21,51 @@ def init_database():
             db.create_all()
             
             # Add new columns to existing SalesforceConnection records if they don't have them
-            print("🔄 Updating existing SalesforceConnection records...")
+            print("🔄 Checking for API version columns...")
             from sqlalchemy import text
             
             # Check if the new columns exist, add them if not
+            columns_exist = True
             try:
                 # Try to select the new columns - if this fails, we need to add them
                 result = db.session.execute(text("SELECT preferred_api_version FROM salesforce_connection LIMIT 1")).fetchone()
+                print("   ✅ API version columns already exist")
             except Exception as e:
-                print("   Adding new API version columns...")
+                print("   ➕ Adding new API version columns...")
+                columns_exist = False
                 try:
-                    # Add the new columns
-                    db.session.execute(text("ALTER TABLE salesforce_connection ADD COLUMN preferred_api_version VARCHAR(10)"))
-                    db.session.execute(text("ALTER TABLE salesforce_connection ADD COLUMN available_api_versions TEXT"))
-                    db.session.execute(text("ALTER TABLE salesforce_connection ADD COLUMN api_versions_last_updated TIMESTAMP"))
-                    db.session.commit()
-                    print("   ✅ API version columns added successfully")
+                    # Rollback any failed transaction first
+                    db.session.rollback()
+                    
+                    # Add the new columns in separate transactions
+                    try:
+                        db.session.execute(text("ALTER TABLE salesforce_connection ADD COLUMN preferred_api_version VARCHAR(10)"))
+                        db.session.commit()
+                        print("   ✅ Added preferred_api_version column")
+                    except Exception as e1:
+                        db.session.rollback()
+                        print(f"   ⚠️  preferred_api_version column may already exist: {e1}")
+                    
+                    try:
+                        db.session.execute(text("ALTER TABLE salesforce_connection ADD COLUMN available_api_versions TEXT"))
+                        db.session.commit()
+                        print("   ✅ Added available_api_versions column")
+                    except Exception as e2:
+                        db.session.rollback()
+                        print(f"   ⚠️  available_api_versions column may already exist: {e2}")
+                    
+                    try:
+                        db.session.execute(text("ALTER TABLE salesforce_connection ADD COLUMN api_versions_last_updated TIMESTAMP"))
+                        db.session.commit()
+                        print("   ✅ Added api_versions_last_updated column")
+                    except Exception as e3:
+                        db.session.rollback()
+                        print(f"   ⚠️  api_versions_last_updated column may already exist: {e3}")
+                    
+                    print("   ✅ API version columns setup completed")
+                    
                 except Exception as alter_error:
-                    print(f"   ⚠️  Could not add columns (they may already exist): {alter_error}")
+                    print(f"   ❌ Error adding columns: {alter_error}")
                     db.session.rollback()
             
             print("✅ Database tables created successfully!")
