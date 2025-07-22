@@ -1,0 +1,3 @@
+"""
+ForceWeaver MCP Server Package
+""" 

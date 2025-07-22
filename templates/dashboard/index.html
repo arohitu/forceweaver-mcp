@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - ForceWeaver MCP Server{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="fw-bold">
+                <i class="bi bi-speedometer2 text-primary"></i> Dashboard
+            </h1>
+            <p class="text-muted">Welcome back, {{ current_user.name }}! Here's your ForceWeaver MCP overview.</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-key fs-1 mb-2"></i>
+                    <h5>API Keys</h5>
+                    <h3>{{ api_keys|length }}</h3>
+                    <small>Active keys</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-building fs-1 mb-2"></i>
+                    <h5>Salesforce Orgs</h5>
+                    <h3>{{ orgs|length }}</h3>
+                    <small>Connected orgs</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-graph-up fs-1 mb-2"></i>
+                    <h5>This Month</h5>
+                    <h3>{{ monthly_stats.total_calls }}</h3>
+                    <small>API calls</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-currency-dollar fs-1 mb-2"></i>
+                    <h5>Monthly Cost</h5>
+                    <h3>${{ "%.2f"|format(monthly_stats.total_cost_dollars) }}</h3>
+                    <small>Total charges</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-lightning-charge text-primary"></i> Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('dashboard.keys') }}" class="btn btn-outline-primary w-100">
+                                <i class="bi bi-key"></i> Manage API Keys
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('dashboard.orgs') }}" class="btn btn-outline-success w-100">
+                                <i class="bi bi-building"></i> Configure Salesforce Orgs
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Keys Section -->
+    {% if api_keys %}
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-key text-primary"></i> API Keys
+                    </h5>
+                    <a href="{{ url_for('dashboard.keys') }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add New Key
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Key</th>
+                                    <th>Last Used</th>
+                                    <th>Usage Count</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key in api_keys[:5] %}
+                                <tr>
+                                    <td>{{ key.name }}</td>
+                                    <td><code>{{ key.key_prefix }}...</code></td>
+                                    <td>
+                                        {% if key.last_used %}
+                                            {{ key.last_used.strftime('%Y-%m-%d %H:%M') }}
+                                        {% else %}
+                                            <span class="text-muted">Never</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ key.usage_count }}</td>
+                                    <td>
+                                        {% if key.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if api_keys|length > 5 %}
+                    <div class="text-center">
+                        <a href="{{ url_for('dashboard.keys') }}" class="btn btn-sm btn-outline-primary">
+                            View All {{ api_keys|length }} API Keys
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card border-primary">
+                <div class="card-body text-center p-5">
+                    <i class="bi bi-key text-primary" style="font-size: 3rem;"></i>
+                    <h4 class="mt-3">No API Keys Yet</h4>
+                    <p class="text-muted">Create your first API key to start using ForceWeaver MCP with AI agents.</p>
+                    <a href="{{ url_for('dashboard.keys') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Create Your First API Key
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Salesforce Orgs Section -->
+    {% if orgs %}
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-building text-success"></i> Salesforce Organizations
+                    </h5>
+                    <a href="{{ url_for('dashboard.orgs') }}" class="btn btn-sm btn-success">
+                        <i class="bi bi-plus-circle"></i> Add New Org
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Identifier</th>
+                                    <th>Org Name</th>
+                                    <th>Type</th>
+                                    <th>Last Auth</th>
+                                    <th>Usage Count</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for org in orgs[:5] %}
+                                <tr>
+                                    <td><strong>{{ org.org_identifier }}</strong></td>
+                                    <td>{{ org.org_name or 'Not Set' }}</td>
+                                    <td>
+                                        {% if org.is_sandbox %}
+                                            <span class="badge bg-warning">Sandbox</span>
+                                        {% else %}
+                                            <span class="badge bg-primary">Production</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if org.last_auth %}
+                                            {{ org.last_auth.strftime('%Y-%m-%d %H:%M') }}
+                                        {% else %}
+                                            <span class="text-muted">Never</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ org.usage_count }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if orgs|length > 5 %}
+                    <div class="text-center">
+                        <a href="{{ url_for('dashboard.orgs') }}" class="btn btn-sm btn-outline-success">
+                            View All {{ orgs|length }} Organizations
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card border-success">
+                <div class="card-body text-center p-5">
+                    <i class="bi bi-building text-success" style="font-size: 3rem;"></i>
+                    <h4 class="mt-3">No Salesforce Orgs Connected</h4>
+                    <p class="text-muted">Connect your first Salesforce org to enable health checking and analysis.</p>
+                    <a href="{{ url_for('dashboard.orgs') }}" class="btn btn-success">
+                        <i class="bi bi-plus-circle"></i> Connect Your First Org
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Activity -->
+    {% if recent_usage %}
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-clock-history text-info"></i> Recent Activity
+                    </h5>
+                    <a href="{{ url_for('dashboard.usage') }}" class="btn btn-sm btn-outline-info">
+                        View All Activity
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Tool</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                    <th>Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in recent_usage %}
+                                <tr>
+                                    <td>{{ log.created_at.strftime('%m/%d %H:%M') }}</td>
+                                    <td>{{ log.tool_name }}</td>
+                                    <td>
+                                        {% if log.execution_time_ms %}
+                                            {{ log.execution_time_ms }}ms
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.success %}
+                                            <span class="badge bg-success">Success</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Error</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>${{ "%.3f"|format(log.cost_cents / 100) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

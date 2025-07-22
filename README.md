@@ -1,234 +1,265 @@
 # ForceWeaver MCP Server
 
-A **Model Context Protocol (MCP) compliant server** that provides AI agents with comprehensive Salesforce Revenue Cloud health checking capabilities. This server follows the official MCP v2025-03-26 specification for maximum compatibility with MCP clients like Claude Desktop, Continue.dev, and other AI development tools.
+**AI-Powered Salesforce Revenue Cloud Health Checking**
 
-## 🎯 What is MCP?
-
-The [Model Context Protocol (MCP)](https://modelcontextprotocol.io) is an open standard that enables AI applications to securely access external data sources and tools. Our MCP server exposes Salesforce Revenue Cloud analysis capabilities through standardized JSON-RPC 2.0 messaging over STDIO transport.
-
-## 🛠️ Available Tools
-
-### `revenue_cloud_health_check`
-
-Performs comprehensive analysis of Salesforce Revenue Cloud configurations, including:
-
-- **Basic Organization Info**: Validates org settings and basic connectivity
-- **Sharing Model Analysis**: Checks Organization-Wide Default (OWD) sharing settings
-- **Bundle Configuration**: Analyzes product bundles and pricing configurations
-- **Attribute Integrity**: Validates picklist fields and data integrity
-
-**Parameters:**
-- `check_types` (optional): Array of specific check types to run
-  - `basic_org_info`: Organization details and connectivity
-  - `sharing_model`: Sharing rules and OWD settings
-  - `bundle_analysis`: Product bundle configuration
-  - `attribute_integrity`: Picklist validation and data integrity
-- `api_version` (optional): Salesforce API version to use (e.g., "v64.0")
+ForceWeaver is a comprehensive Salesforce health monitoring solution designed for AI agents. Built on the Model Context Protocol (MCP), it enables AI tools like Claude Desktop and VS Code GitHub Copilot to perform intelligent analysis of your Salesforce Revenue Cloud setup.
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### 1. Sign Up & Get API Key
 
-1. **Python 3.11+** installed
-2. **Salesforce Connected App** configured for OAuth
-3. **Valid Salesforce credentials** (access token, refresh token, org details)
+1. Visit **[mcp.forceweaver.com](https://mcp.forceweaver.com)**
+2. Create your account
+3. Generate an API key from the dashboard
 
-### Installation
+### 2. Connect Salesforce Org
 
-```bash
-# Clone the repository
-git clone https://github.com/your-repo/forceweaver-mcp.git
-cd forceweaver-mcp
+1. Create a Salesforce Connected App
+2. Add your org credentials in the dashboard
+3. Configure OAuth settings
 
-# Install dependencies
-pip install -r requirements.txt
+### 3. Configure AI Agent
 
-# Copy and configure environment
-cp env.template .env
-# Edit .env with your Salesforce credentials
-```
-
-### Configuration
-
-Set the following environment variables in your `.env` file:
-
-```bash
-# Required: Salesforce Connection Details
-SALESFORCE_INSTANCE_URL=https://your-org.my.salesforce.com
-SALESFORCE_ACCESS_TOKEN=your_salesforce_access_token
-SALESFORCE_REFRESH_TOKEN=your_salesforce_refresh_token
-SALESFORCE_ORG_ID=00D000000000000
-
-# Required: Salesforce OAuth Application
-SALESFORCE_CLIENT_ID=your_connected_app_client_id
-SALESFORCE_CLIENT_SECRET=your_connected_app_client_secret
-
-# Optional: API Version and Logging
-SALESFORCE_API_VERSION=v64.0
-LOG_LEVEL=INFO
-```
-
-### Running the MCP Server
-
-```bash
-# Start the MCP server
-python server.py
-```
-
-The server will start and listen on STDIN/STDOUT for JSON-RPC 2.0 messages according to the MCP specification.
-
-## 🔧 MCP Client Configuration
-
-### Claude Desktop
-
-Add to your `claude_desktop_config.json`:
+**VS Code GitHub Copilot:**
 
 ```json
 {
-  "mcpServers": {
+  "github.copilot.chat.mcpServers": {
     "forceweaver": {
       "command": "python",
-      "args": ["server.py"],
-      "cwd": "/path/to/forceweaver-mcp"
+      "args": ["mcp_server/enhanced_server.py"],
+      "env": {
+        "FORCEWEAVER_API_KEY": "fk_your_api_key",
+        "SALESFORCE_ORG_ID": "production"
+      }
     }
   }
 }
 ```
 
-### Continue.dev
+### 4. Start Analyzing!
 
-Add to your `config.json`:
-
-```json
-{
-  "mcpServers": [
-    {
-      "name": "forceweaver",
-      "command": "python",
-      "args": ["server.py"],
-      "cwd": "/path/to/forceweaver-mcp"
-    }
-  ]
-}
-```
-
-## 📡 MCP Protocol Details
-
-This server implements the following MCP capabilities:
-
-### Server Features
-- ✅ **Tools**: Exposes `revenue_cloud_health_check` tool
-- ✅ **Tool Calling**: Full JSON-RPC 2.0 tool execution
-- ✅ **Error Handling**: Structured error responses
-- ✅ **Logging**: Proper stderr logging (stdout reserved for protocol)
-
-### Protocol Methods
-- `initialize`: Server initialization and capability negotiation
-- `tools/list`: Lists available tools with schemas
-- `tools/call`: Executes tool with parameters
-- `ping`: Health check and connectivity test
-
-## 🧪 Testing
-
-### Manual Testing
-
-```bash
-# Test basic connectivity
-echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | python server.py
-
-# List available tools
-echo '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | python server.py
-
-# Call health check tool
-echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"revenue_cloud_health_check","arguments":{"check_types":["basic_org_info"]}}}' | python server.py
-```
-
-### With MCP Client
-
-```bash
-# Using the MCP CLI tool (if available)
-mcp call forceweaver revenue_cloud_health_check '{"check_types": ["basic_org_info", "sharing_model"]}'
-```
+Ask your AI agent:
+- "Check the health of my Salesforce org"
+- "Analyze the sharing model configuration" 
+- "Run a comprehensive Revenue Cloud health check"
 
 ## 🏗️ Architecture
 
+ForceWeaver uses a hybrid architecture combining a Flask web application with an enhanced MCP server:
+
 ```
-┌─────────────────┐    JSON-RPC 2.0     ┌──────────────────┐
-│   MCP Client    │ ◄──── STDIO ────► │  MCP Server      │
-│  (Claude, etc.) │                    │  (ForceWeaver)   │
-└─────────────────┘                    └──────────────────┘
-                                               │
-                                               │ simple-salesforce
-                                               ▼
-                                       ┌──────────────────┐
-                                       │  Salesforce API  │
-                                       │   (REST/SOQL)    │
-                                       └──────────────────┘
-```
-
-### Components
-
-- **`server.py`**: Main MCP server implementation using FastMCP
-- **`services/salesforce_service.py`**: Salesforce API client wrapper
-- **`services/health_checker_service.py`**: Revenue Cloud analysis logic
-- **STDIO Transport**: JSON-RPC 2.0 messages over standard input/output
-
-## 🛡️ Security Considerations
-
-- **Environment-based Authentication**: No API keys stored in code
-- **Token Management**: Secure handling of Salesforce OAuth tokens
-- **Logging**: Sensitive data logged only to stderr, never stdout
-- **Input Validation**: All tool parameters validated against JSON schemas
-
-## 🚢 Deployment
-
-### Heroku
-
-```bash
-# Deploy to Heroku
-heroku create your-app-name
-heroku config:set SALESFORCE_INSTANCE_URL=https://your-org.salesforce.com
-heroku config:set SALESFORCE_ACCESS_TOKEN=your_token
-# ... set other environment variables
-git push heroku main
+┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+│   AI Agent          │    │   MCP Server        │    │   Web Application   │
+│   (VS Code/Claude)  │◄──►│   Enhanced Server   │◄──►│   mcp.forceweaver.  │
+│                     │    │   - Tool execution  │    │   com               │
+│                     │    │   - Validation      │    │   - User management │
+└─────────────────────┘    │   - Rate limiting   │    │   - API key mgmt    │
+                           └─────────────────────┘    │   - Billing         │
+                                      │               └─────────────────────┘
+                                      ▼                          │
+                           ┌─────────────────────┐              │
+                           │   Salesforce Org    │◄─────────────┘
+                           │   - Health checks   │
+                           │   - Revenue Cloud   │
+                           └─────────────────────┘
 ```
 
-### Docker
+## 🔧 Available Health Checks
 
-```bash
-# Build image
-docker build -t forceweaver-mcp .
+### Basic Checks ($0.01 each)
 
-# Run with environment file
-docker run --env-file .env forceweaver-mcp
-```
+| Check | Description |
+|-------|-------------|
+| `basic_org_info` | Organization details, users, trial status |
+| `sharing_model` | OWDs, sharing rules, access levels |
+| `bundle_analysis` | Products, pricebooks, quotes, orders |
+| `data_integrity` | Duplicates, missing fields, orphaned records |
+
+### Premium Checks ($0.05 each)
+
+| Check | Description |
+|-------|-------------|
+| `performance_metrics` | API usage, response times, performance |
+| `security_audit` | User permissions, field-level security |
+
+## 🛠️ Development Setup
+
+### Prerequisites
+
+- Python 3.8+
+- PostgreSQL
+- Heroku CLI (for deployment)
 
 ### Local Development
 
 ```bash
-# Run with debug logging
-LOG_LEVEL=DEBUG python server.py
+# Clone repository
+git clone https://github.com/forceweaver/mcp-server.git
+cd mcp-server
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Setup environment
+cp env.template .env
+# Edit .env with your configuration
+
+# Initialize database
+python seed_db.py
+
+# Run Flask web app
+python app.py
+
+# Run MCP server (separate terminal)
+python mcp_server/enhanced_server.py
 ```
 
-## 📚 MCP Resources
+### Environment Variables
 
-- [Model Context Protocol Specification](https://spec.modelcontextprotocol.io)
-- [MCP Python SDK Documentation](https://modelcontextprotocol.io/python)
-- [MCP Client Integration Guides](https://modelcontextprotocol.io/clients)
-- [FastMCP Framework](https://github.com/modelcontextprotocol/python-sdk)
+```bash
+# Flask Web App
+SECRET_KEY=your-secret-key
+ENCRYPTION_KEY=your-encryption-key
+DATABASE_URL=postgresql://user:pass@localhost/forceweaver_mcp
+
+# MCP Server  
+VALIDATION_URL=http://localhost:5000
+
+# Admin User
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=secure-password
+```
+
+## 🚀 Deployment
+
+### Heroku Deployment
+
+```bash
+# Create Heroku app
+heroku create forceweaver-mcp
+
+# Add PostgreSQL
+heroku addons:create heroku-postgresql:mini
+
+# Set environment variables
+heroku config:set SECRET_KEY=your-secret-key
+heroku config:set ENCRYPTION_KEY=your-encryption-key
+heroku config:set ADMIN_EMAIL=your-email
+heroku config:set ADMIN_PASSWORD=secure-password
+
+# Deploy
+git push heroku main
+
+# Seed database
+heroku run python seed_db.py
+```
+
+### Domain Setup
+
+1. Configure custom domain in Heroku
+2. Update DNS records to point to Heroku
+3. Add SSL certificate
+
+## 📁 Project Structure
+
+```
+forceweaver-mcp/
+├── app/                          # Flask web application
+│   ├── __init__.py              # App factory
+│   ├── models/                  # Database models
+│   │   ├── user.py             # User authentication
+│   │   ├── api_key.py          # API key management
+│   │   ├── salesforce_org.py   # Salesforce org config
+│   │   ├── usage_log.py        # Usage tracking
+│   │   └── rate_configuration.py
+│   ├── web/                    # HTML routes
+│   │   ├── main_routes.py      # Landing pages
+│   │   ├── auth_routes.py      # Authentication
+│   │   └── dashboard_routes.py # User dashboard
+│   └── api/v1/                 # API endpoints
+│       └── internal_api.py     # MCP server integration
+├── mcp_server/                  # Enhanced MCP server
+│   ├── enhanced_server.py      # Main MCP server
+│   ├── validation_client.py    # Web app integration
+│   ├── salesforce_client.py    # Salesforce API client
+│   └── health_checker.py       # Health check logic
+├── templates/                   # HTML templates
+├── app.py                      # Flask entry point
+├── seed_db.py                  # Database initialization
+└── requirements.txt            # Dependencies
+```
+
+## 🔐 Security Features
+
+### Data Protection
+- **Encrypted credentials**: Salesforce secrets encrypted at rest
+- **Secure API keys**: Bcrypt hashed with secure generation
+- **No data persistence**: Salesforce data accessed temporarily only
+- **HTTPS everywhere**: All communications encrypted
+
+### Access Control
+- **User authentication**: Email-based registration/login
+- **API key management**: Easy generation and revocation
+- **Usage tracking**: Complete audit trail
+- **Rate limiting**: Configurable per-user limits
+
+## 📊 Monitoring & Analytics
+
+### Usage Dashboard
+- Real-time API call monitoring
+- Success rate tracking
+- Cost analysis and optimization
+- Detailed activity logs
+
+### Billing
+- Pay-per-use model
+- Transparent pricing
+- Monthly invoicing
+- Cost optimization tools
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Ensure MCP compliance with `mcp validate`
-4. Add tests for new functionality
+3. Make your changes
+4. Add tests
 5. Submit a pull request
+
+### Development Guidelines
+
+- Follow PEP 8 style guide
+- Add type hints
+- Include docstrings
+- Write tests for new features
+- Update documentation
+
+## 📚 Documentation
+
+- **[User Guide](USER_GUIDE.md)** - Complete setup and usage guide
+- **[API Reference](docs/api.md)** - Internal API documentation
+- **[MCP Integration](docs/mcp.md)** - MCP client setup
+- **[Deployment Guide](docs/deployment.md)** - Production deployment
+
+## 🆘 Support
+
+- **Dashboard**: Built-in support tickets
+- **Email**: support@forceweaver.com
+- **Documentation**: [docs.forceweaver.com](https://docs.forceweaver.com)
+- **GitHub Issues**: Bug reports and feature requests
 
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## 🙏 Acknowledgments
+
+- Built on the [Model Context Protocol](https://modelcontextprotocol.io)
+- Powered by [FastMCP](https://github.com/jlowin/fastmcp)
+- Inspired by the Salesforce developer community
+
 ---
 
-**Built with ❤️ for the MCP ecosystem**
+**Ready to supercharge your Salesforce monitoring with AI?** 
+
+[Get Started →](https://mcp.forceweaver.com) | [View Documentation →](USER_GUIDE.md)

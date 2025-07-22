@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}Pricing - ForceWeaver MCP Server{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="row mb-5">
+        <div class="col text-center">
+            <h1 class="fw-bold">Simple, Transparent Pricing</h1>
+            <p class="lead text-muted">Pay only for what you use. No monthly fees, no hidden costs.</p>
+        </div>
+    </div>
+
+    <!-- Pay-Per-Use Model -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3 class="card-title">Pay-Per-Use Model</h3>
+                    <p class="mb-0">Perfect for teams of all sizes</p>
+                </div>
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <h2 class="text-primary">$0.01 - $0.05</h2>
+                        <p class="text-muted">per API call</p>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="text-success">✓ What's Included</h5>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-check-circle text-success"></i> Unlimited API keys</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Unlimited Salesforce orgs</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Real-time health checking</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Usage analytics dashboard</li>
+                                <li><i class="bi bi-check-circle text-success"></i> Email support</li>
+                                <li><i class="bi bi-check-circle text-success"></i> All basic health checks</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="text-primary">✓ Perfect For</h5>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-arrow-right text-primary"></i> Development teams</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Salesforce consultants</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> System administrators</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> AI agent workflows</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Automated monitoring</li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> Ad-hoc analysis</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        {% if not current_user.is_authenticated %}
+                        <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-rocket-takeoff"></i> Get Started Free
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-speedometer2"></i> Go to Dashboard
+                        </a>
+                        {% endif %}
+                        <p class="small text-muted mt-2">No credit card required • Start using immediately</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pricing Breakdown -->
+    <div class="row mb-5">
+        <div class="col-lg-10 mx-auto">
+            <h2 class="text-center mb-4">Detailed Pricing</h2>
+            
+            <div class="row">
+                <!-- Basic Checks -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-success text-white">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-check-circle"></i> Basic Health Checks
+                            </h4>
+                            <p class="mb-0">Essential Salesforce monitoring</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-3">
+                                <h3 class="text-success">$0.01</h3>
+                                <p class="text-muted">per API call</p>
+                            </div>
+                            
+                            <h6>Included Check Types:</h6>
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <strong>Basic Org Info</strong><br>
+                                    <small class="text-muted">Organization details, user count, trial status, currency setup</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Sharing Model Analysis</strong><br>
+                                    <small class="text-muted">Organization-wide defaults, sharing rules, access levels</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Bundle Analysis</strong><br>
+                                    <small class="text-muted">Product bundles, pricebooks, quotes, orders, contracts</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Data Integrity Check</strong><br>
+                                    <small class="text-muted">Duplicate records, missing fields, orphaned data</small>
+                                </li>
+                            </ul>
+                            
+                            <div class="alert alert-success mt-3">
+                                <i class="bi bi-lightbulb"></i>
+                                <strong>Ideal for:</strong> Regular monitoring, basic health assessments, development workflows
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Premium Checks -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card h-100 border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h4 class="card-title mb-0">
+                                <i class="bi bi-star"></i> Premium Health Checks
+                            </h4>
+                            <p class="mb-0">Advanced analysis and insights</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-3">
+                                <h3 class="text-warning">$0.05</h3>
+                                <p class="text-muted">per API call</p>
+                            </div>
+                            
+                            <h6>Premium Check Types:</h6>
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <strong>Performance Metrics</strong><br>
+                                    <small class="text-muted">API usage patterns, response times, system performance analysis</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Security Audit</strong><br>
+                                    <small class="text-muted">User permissions, field-level security, access patterns</small>
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Coming Soon:</strong><br>
+                                    <small class="text-muted">Custom rule validation, compliance checking, advanced reporting</small>
+                                </li>
+                            </ul>
+                            
+                            <div class="alert alert-warning mt-3">
+                                <i class="bi bi-graph-up-arrow"></i>
+                                <strong>Perfect for:</strong> Deep analysis, security audits, compliance reviews, quarterly assessments
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Examples -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-calculator"></i> Cost Examples
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Usage Pattern</th>
+                                    <th>Calls/Month</th>
+                                    <th>Check Types</th>
+                                    <th>Monthly Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Light Usage</strong><br><small>Weekly basic checks</small></td>
+                                    <td>20</td>
+                                    <td>Basic only</td>
+                                    <td class="text-success"><strong>$0.20</strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Regular Monitoring</strong><br><small>Daily basic + weekly deep</small></td>
+                                    <td>100</td>
+                                    <td>Basic + some premium</td>
+                                    <td class="text-primary"><strong>$1.50</strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Active Development</strong><br><small>Multiple daily checks</small></td>
+                                    <td>500</td>
+                                    <td>Mostly basic</td>
+                                    <td class="text-warning"><strong>$5.00</strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Enterprise Usage</strong><br><small>Automated workflows</small></td>
+                                    <td>2000</td>
+                                    <td>Mixed basic + premium</td>
+                                    <td class="text-info"><strong>$25.00</strong></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Note:</strong> These are examples. Your actual costs depend on your specific usage patterns and check types.
+                        Monitor your usage in the dashboard to track costs in real-time.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Benefits -->
+    <div class="row mb-5">
+        <div class="col-lg-10 mx-auto">
+            <h2 class="text-center mb-4">Why Pay-Per-Use?</h2>
+            
+            <div class="row">
+                <div class="col-md-4 text-center mb-4">
+                    <div class="card border-0">
+                        <div class="card-body">
+                            <i class="bi bi-piggy-bank text-success" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3">Cost Effective</h5>
+                            <p class="text-muted">Pay only for what you actually use. No wasted monthly fees for unused capacity.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 text-center mb-4">
+                    <div class="card border-0">
+                        <div class="card-body">
+                            <i class="bi bi-graph-up text-primary" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3">Scalable</h5>
+                            <p class="text-muted">Scale up or down instantly. Perfect for varying workloads and seasonal usage.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 text-center mb-4">
+                    <div class="card border-0">
+                        <div class="card-body">
+                            <i class="bi bi-eye text-info" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3">Transparent</h5>
+                            <p class="text-muted">See exactly what you're paying for. Real-time usage tracking and detailed billing.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto">
+            <h2 class="text-center mb-4">Frequently Asked Questions</h2>
+            
+            <div class="accordion" id="faqAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq1">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse1">
+                            How does billing work?
+                        </button>
+                    </h2>
+                    <div id="collapse1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            We track every API call and charge based on the check types used. You'll receive a monthly invoice
+                            with detailed usage breakdown. Currently, billing is manual, but automated billing is coming soon.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq2">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse2">
+                            Are there any minimum charges or commitments?
+                        </button>
+                    </h2>
+                    <div id="collapse2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            No minimum charges, no monthly commitments. You only pay for the API calls you make.
+                            If you don't use the service in a month, you pay nothing.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq3">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse3">
+                            Can I set spending limits?
+                        </button>
+                    </h2>
+                    <div id="collapse3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Currently, you can monitor usage in real-time through your dashboard. Spending limits and
+                            alerts are planned for a future update. Contact support if you need help managing costs.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq4">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse4">
+                            Do failed API calls count toward billing?
+                        </button>
+                    </h2>
+                    <div id="collapse4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Failed calls due to ForceWeaver server errors are not billed. However, calls that fail due to
+                            Salesforce authentication or configuration issues are still counted, as our servers processed the request.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="row">
+        <div class="col-lg-6 mx-auto text-center">
+            <div class="card border-primary">
+                <div class="card-body p-4">
+                    <h3>Ready to Get Started?</h3>
+                    <p class="text-muted">Join teams already using ForceWeaver MCP for smarter Salesforce monitoring.</p>
+                    
+                    {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg me-3">
+                        <i class="bi bi-person-plus"></i> Sign Up Free
+                    </a>
+                    <a href="{{ url_for('main.docs') }}" class="btn btn-outline-secondary btn-lg">
+                        <i class="bi bi-book"></i> View Docs
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('dashboard.keys') }}" class="btn btn-primary btn-lg me-3">
+                        <i class="bi bi-key"></i> Create API Key
+                    </a>
+                    <a href="{{ url_for('dashboard.orgs') }}" class="btn btn-success btn-lg">
+                        <i class="bi bi-building"></i> Connect Salesforce
+                    </a>
+                    {% endif %}
+                    
+                    <p class="small text-muted mt-3">
+                        No credit card required • Start monitoring immediately • Cancel anytime
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

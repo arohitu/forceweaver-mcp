@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - ForceWeaver MCP Server{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- Header -->
+            <div class="row mb-4">
+                <div class="col">
+                    <h1 class="fw-bold">
+                        <i class="bi bi-person-gear text-primary"></i> Profile
+                    </h1>
+                    <p class="text-muted">Manage your ForceWeaver account settings and information.</p>
+                </div>
+            </div>
+
+            <!-- User Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-person"></i> Account Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Name:</strong> {{ current_user.name }}</p>
+                            <p><strong>Email:</strong> {{ current_user.email }}</p>
+                            <p><strong>Account Type:</strong> 
+                                {% if current_user.is_admin %}
+                                    <span class="badge bg-danger">Administrator</span>
+                                {% else %}
+                                    <span class="badge bg-primary">Standard User</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Member Since:</strong> {{ current_user.created_at.strftime('%B %d, %Y') }}</p>
+                            <p><strong>Last Login:</strong> 
+                                {% if current_user.last_login %}
+                                    {{ current_user.last_login.strftime('%B %d, %Y at %H:%M') }}
+                                {% else %}
+                                    <span class="text-muted">Never</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Status:</strong> 
+                                {% if current_user.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Statistics -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-graph-up"></i> Account Statistics
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body py-3">
+                                    <h4>{{ current_user.api_keys.filter_by(is_active=True).count() }}</h4>
+                                    <small>Active API Keys</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body py-3">
+                                    <h4>{{ current_user.salesforce_orgs.filter_by(is_active=True).count() }}</h4>
+                                    <small>Connected Orgs</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body py-3">
+                                    <h4>{{ current_user.usage_logs.count() }}</h4>
+                                    <small>Total API Calls</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-center mb-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body py-3">
+                                    <h4>${{ "%.2f"|format((current_user.usage_logs | sum(attribute='cost_cents') | default(0)) / 100) }}</h4>
+                                    <small>Total Spent</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-lightning-charge"></i> Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('dashboard.keys') }}" class="btn btn-outline-primary w-100">
+                                <i class="bi bi-key"></i> Manage API Keys
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('dashboard.orgs') }}" class="btn btn-outline-success w-100">
+                                <i class="bi bi-building"></i> Manage Salesforce Orgs
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('dashboard.usage') }}" class="btn btn-outline-info w-100">
+                                <i class="bi bi-graph-up"></i> View Usage & Billing
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <a href="{{ url_for('main.docs') }}" class="btn btn-outline-secondary w-100">
+                                <i class="bi bi-book"></i> Documentation
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Settings -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-shield-check"></i> Security
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6>Account Security</h6>
+                    <p class="text-muted">Keep your account secure with these best practices:</p>
+                    
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success"></i>
+                            Use strong, unique passwords
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success"></i>
+                            Regularly rotate API keys
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success"></i>
+                            Monitor usage logs for unusual activity
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-check-circle text-success"></i>
+                            Keep Salesforce Connected App secrets secure
+                        </li>
+                    </ul>
+
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Note:</strong> Password changes and advanced security settings will be available in a future update.
+                        For now, contact support if you need to change your password or have security concerns.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

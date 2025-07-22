@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}Salesforce Orgs - ForceWeaver MCP Server{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="fw-bold">
+                <i class="bi bi-building text-success"></i> Salesforce Organizations
+            </h1>
+            <p class="text-muted">Configure your Salesforce org connections for health checking and analysis.</p>
+        </div>
+    </div>
+
+    <!-- Add New Org Card -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-plus-circle text-success"></i> Connect New Salesforce Org
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('dashboard.create_org') }}">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="org_identifier" class="form-label">Org Identifier *</label>
+                                <input type="text" class="form-control" id="org_identifier" name="org_identifier" 
+                                       placeholder="e.g., production, sandbox, dev" required pattern="[a-zA-Z0-9_-]+">
+                                <div class="form-text">Unique identifier for this org (letters, numbers, hyphens, underscores only)</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="instance_url" class="form-label">Salesforce Instance URL *</label>
+                                <input type="url" class="form-control" id="instance_url" name="instance_url" 
+                                       placeholder="https://yourorg.my.salesforce.com" required>
+                                <div class="form-text">Your Salesforce org's domain</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="client_id" class="form-label">Client ID *</label>
+                                <input type="text" class="form-control" id="client_id" name="client_id" 
+                                       placeholder="Connected App Client ID" required>
+                                <div class="form-text">From your Salesforce Connected App</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="client_secret" class="form-label">Client Secret *</label>
+                                <input type="password" class="form-control" id="client_secret" name="client_secret" 
+                                       placeholder="Connected App Client Secret" required>
+                                <div class="form-text">Will be encrypted and stored securely</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_sandbox" name="is_sandbox">
+                                    <label class="form-check-label" for="is_sandbox">
+                                        This is a Sandbox org
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-plus"></i> Connect Salesforce Org
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Setup Instructions -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-gear"></i> Salesforce Connected App Setup
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p>To connect your Salesforce org, you need to create a Connected App with OAuth settings:</p>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>1. Create Connected App</h6>
+                            <ul class="small">
+                                <li>Go to Salesforce Setup → Apps → App Manager</li>
+                                <li>Click "New Connected App"</li>
+                                <li>Fill in basic information</li>
+                                <li>Enable OAuth Settings</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>2. OAuth Configuration</h6>
+                            <ul class="small">
+                                <li><strong>Callback URL:</strong> <code>https://mcp.forceweaver.com/callback</code></li>
+                                <li><strong>OAuth Scopes:</strong> "Perform requests on your behalf at any time (refresh_token, offline_access)" and "Access and manage your data (api)"</li>
+                                <li><strong>Grant Types:</strong> Enable "Client Credentials Flow"</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <div class="alert alert-info small">
+                            <strong>Note:</strong> After creating the Connected App, you may need to wait 2-10 minutes for changes to take effect, 
+                            then get the Client ID and Client Secret from the Connected App details.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Existing Orgs -->
+    {% if orgs %}
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-list"></i> Connected Organizations ({{ orgs|length }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Identifier</th>
+                                    <th>Organization</th>
+                                    <th>Type</th>
+                                    <th>Instance URL</th>
+                                    <th>Created</th>
+                                    <th>Last Auth</th>
+                                    <th>Usage</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for org in orgs %}
+                                <tr>
+                                    <td>
+                                        <strong class="text-primary">{{ org.org_identifier }}</strong>
+                                        {% if org.last_error %}
+                                        <br><small class="text-danger">
+                                            <i class="bi bi-exclamation-triangle"></i> Auth Error
+                                        </small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ org.org_name or 'Not Retrieved' }}
+                                        {% if org.salesforce_org_id %}
+                                        <br><small class="text-muted">{{ org.salesforce_org_id }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if org.is_sandbox %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="bi bi-wrench"></i> Sandbox
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-primary">
+                                                <i class="bi bi-building"></i> Production
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ org.instance_url }}" target="_blank" class="text-decoration-none small">
+                                            {{ org.instance_url|replace('https://', '') }}
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </a>
+                                    </td>
+                                    <td>{{ org.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if org.last_auth %}
+                                            <span class="text-success">
+                                                {{ org.last_auth.strftime('%m/%d %H:%M') }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">Never</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ org.usage_count }} calls</span>
+                                    </td>
+                                    <td>
+                                        {% if org.is_active %}
+                                            {% if org.last_error %}
+                                                <span class="badge bg-warning text-dark" 
+                                                      title="{{ org.last_error }}">Error</span>
+                                            {% else %}
+                                                <span class="badge bg-success">Active</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if org.last_error %}
+                                <tr class="table-warning">
+                                    <td colspan="8" class="small">
+                                        <i class="bi bi-exclamation-triangle text-warning"></i>
+                                        <strong>Last Error:</strong> {{ org.last_error }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col">
+            <div class="card border-success">
+                <div class="card-body text-center p-5">
+                    <i class="bi bi-building text-success" style="font-size: 4rem;"></i>
+                    <h3 class="mt-3">No Salesforce Orgs Connected</h3>
+                    <p class="text-muted">
+                        Connect your first Salesforce organization to start using ForceWeaver health checking tools.
+                    </p>
+                    <p class="text-muted">
+                        You can connect multiple orgs - production, sandbox, and development environments.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Usage Examples -->
+    {% if orgs %}
+    <div class="row mt-4">
+        <div class="col">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-lightbulb"></i> Usage Examples
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>VS Code Settings Example</h6>
+                            <pre class="small bg-light p-2 rounded"><code>{
+  "github.copilot.chat.mcpServers": {
+    "forceweaver": {
+      "command": "python",
+      "args": ["mcp_server/enhanced_server.py"],
+      "env": {
+        "FORCEWEAVER_API_KEY": "your_api_key",
+        "SALESFORCE_ORG_ID": "{{ orgs[0].org_identifier if orgs else 'production' }}"
+      }
+    }
+  }
+}</code></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>AI Agent Queries</h6>
+                            <div class="small">
+                                <p><strong>Example queries to try with your AI agent:</strong></p>
+                                <ul>
+                                    <li>"Check the health of my {{ orgs[0].org_identifier if orgs else 'production' }} Salesforce org"</li>
+                                    <li>"Analyze the sharing model in my Salesforce setup"</li>
+                                    <li>"Run a comprehensive Revenue Cloud health check"</li>
+                                    <li>"Check for data integrity issues in Salesforce"</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Security Notice -->
+    <div class="row mt-4">
+        <div class="col">
+            <div class="alert alert-warning">
+                <h6><i class="bi bi-shield-exclamation"></i> Security & Privacy</h6>
+                <ul class="mb-0">
+                    <li>Client secrets are encrypted before storage using industry-standard encryption</li>
+                    <li>ForceWeaver only accesses your Salesforce data to perform requested health checks</li>
+                    <li>No Salesforce data is stored permanently - only temporary access for analysis</li>
+                    <li>You can disconnect orgs at any time to revoke access</li>
+                    <li>All API calls are logged for usage tracking and billing purposes</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
