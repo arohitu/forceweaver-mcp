@@ -270,6 +270,26 @@
                         <br><br>
                         <strong>Authorization Header:</strong><br>
                         <code>Authorization: Bearer YOUR_API_KEY</code>
+                        <br><br>
+                        <strong>API Version:</strong><br>
+                        {% if customer.salesforce_connection %}
+                            <span class="badge bg-primary">{{ customer.salesforce_connection.get_effective_api_version() }}</span>
+                            <small class="text-muted">
+                                {% if customer.salesforce_connection.preferred_api_version %}
+                                    (preferred version)
+                                {% else %}
+                                    (latest available)
+                                {% endif %}
+                            </small>
+                            <br>
+                            <small class="text-muted">
+                                <a href="{{ url_for('dashboard.salesforce') }}" class="text-decoration-none">
+                                    <i class="bi bi-gear"></i> Change API version
+                                </a>
+                            </small>
+                        {% else %}
+                            <span class="text-muted">Connect Salesforce to see API version</span>
+                        {% endif %}
                     </div>
                     <div class="col-md-4">
                         <strong>Last API Usage:</strong><br>

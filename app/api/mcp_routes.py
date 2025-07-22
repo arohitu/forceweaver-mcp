@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 from app.core.security import require_api_key
-from app.services.salesforce_service import get_salesforce_api_client
+from app.services.salesforce_service import get_salesforce_api_client, update_connection_api_versions
 from app.services.health_checker_service import RevenueCloudHealthChecker
 
 mcp_bp = Blueprint('mcp', __name__)
@@ -15,7 +15,21 @@ def perform_health_check():
         if not connection:
             return jsonify({"error": "No Salesforce connection found for this customer."}), 400
 
-        sf_client = get_salesforce_api_client(connection)
+        # Ensure we have API versions available (fetch if needed)
+        try:
+            update_connection_api_versions(connection)
+        except Exception as e:
+            # Log but don't fail - we can still proceed with default version
+            import logging
+            logging.getLogger(__name__).warning(f"Could not update API versions: {e}")
+
+        # Get the effective API version to use
+        api_version = connection.get_effective_api_version()
+        
+        # Create Salesforce client with the preferred API version
+        sf_client = get_salesforce_api_client(connection, api_version=api_version)
+        
+        # Run health checks
         checker = RevenueCloudHealthChecker(sf_client)
         results = checker.run_all_checks()
 
@@ -23,6 +37,7 @@ def perform_health_check():
             "success": True,
             "customer_id": g.customer.id,
             "salesforce_org_id": connection.salesforce_org_id,
+            "api_version_used": api_version,
             "health_check_results": results
         })
     
@@ -46,6 +61,10 @@ def get_available_tools():
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Specific types of checks to perform (optional, defaults to all)"
+                    },
+                    "api_version": {
+                        "type": "string",
+                        "description": "Salesforce API version to use (optional, defaults to customer's preferred version)"
                     }
                 }
             }
@@ -73,7 +92,10 @@ def get_service_status():
             "customer_id": g.customer.id,
             "salesforce_connected": connection is not None,
             "salesforce_org_id": connection.salesforce_org_id if connection else None,
-            "instance_url": connection.instance_url if connection else None
+            "instance_url": connection.instance_url if connection else None,
+            "preferred_api_version": connection.preferred_api_version if connection else None,
+            "effective_api_version": connection.get_effective_api_version() if connection else None,
+            "available_api_versions": connection.available_versions_list if connection else []
         })
     
     except Exception as e:

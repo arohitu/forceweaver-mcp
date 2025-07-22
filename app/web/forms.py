@@ -56,6 +56,19 @@ class APIKeyForm(FlaskForm):
     ])
     submit = SubmitField('Create API Key')
 
+class APIVersionForm(FlaskForm):
+    """Form to select preferred Salesforce API version"""
+    api_version = SelectField('Preferred API Version', validators=[DataRequired()])
+    submit = SubmitField('Save API Version')
+    
+    def __init__(self, available_versions=None, *args, **kwargs):
+        super(APIVersionForm, self).__init__(*args, **kwargs)
+        if available_versions:
+            # Convert list of versions to choices for SelectField
+            self.api_version.choices = [(v, f"{v} (Version {v[1:]})") for v in available_versions]
+        else:
+            self.api_version.choices = []
+
 class RunHealthCheckForm(FlaskForm):
     """Form to run health check"""
     submit = SubmitField('Run Health Check') 

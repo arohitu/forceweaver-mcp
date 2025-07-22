@@ -7,10 +7,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app import db
 from app.models import Customer, APIKey, SalesforceConnection, HealthCheckHistory
-from app.web.forms import ConnectSalesforceForm, APIKeyForm, RunHealthCheckForm
+from app.web.forms import ConnectSalesforceForm, APIKeyForm, APIVersionForm, RunHealthCheckForm
 from app.core.security import generate_api_key, hash_api_key
 from app.services.health_checker_service import RevenueCloudHealthChecker
-from app.services.salesforce_service import get_salesforce_api_client
+from app.services.salesforce_service import get_salesforce_api_client, update_connection_api_versions
 import json
 from datetime import datetime, timedelta
 import secrets
@@ -159,12 +159,33 @@ def salesforce():
     
     connection = customer.salesforce_connection if customer else None
     
-    form = ConnectSalesforceForm()
+    # Prepare forms
+    connect_form = ConnectSalesforceForm()
+    api_version_form = None
+    
+    if connection:
+        # Update API versions if needed (once per day max)
+        try:
+            available_versions = update_connection_api_versions(connection)
+        except Exception as e:
+            current_app.logger.error(f"Error updating API versions: {e}")
+            available_versions = connection.available_versions_list or []
+        
+        # Create API version form with available versions
+        if available_versions:
+            api_version_form = APIVersionForm(available_versions=available_versions)
+            # Set current value
+            if connection.preferred_api_version:
+                api_version_form.api_version.data = connection.preferred_api_version
+            else:
+                # Default to latest version
+                api_version_form.api_version.data = available_versions[0]
     
     return render_template('dashboard/salesforce.html', 
                          customer=customer, 
                          connection=connection,
-                         form=form)
+                         connect_form=connect_form,
+                         api_version_form=api_version_form)
 
 @dashboard_bp.route('/connect-salesforce', methods=['POST'])
 @login_required
@@ -288,6 +309,102 @@ def revoke_api_key():
         flash('No API key found to revoke', 'error')
     
     return redirect(url_for('dashboard.api_keys'))
+
+@dashboard_bp.route('/update-api-version', methods=['POST'])
+@login_required
+def update_api_version():
+    """Update preferred API version"""
+    customer = get_or_create_customer()
+    
+    if not customer.salesforce_connection:
+        flash('Please connect a Salesforce organization first', 'error')
+        return redirect(url_for('dashboard.salesforce'))
+    
+    connection = customer.salesforce_connection
+    available_versions = connection.available_versions_list or []
+    
+    if not available_versions:
+        flash('No API versions available. Please refresh the version list first.', 'error')
+        return redirect(url_for('dashboard.salesforce'))
+    
+    form = APIVersionForm(available_versions=available_versions)
+    
+    if form.validate_on_submit():
+        new_version = form.api_version.data
+        
+        # Validate that the selected version is in the available list
+        if new_version not in available_versions:
+            flash('Invalid API version selected', 'error')
+            return redirect(url_for('dashboard.salesforce'))
+        
+        # Update the connection
+        old_version = connection.preferred_api_version
+        connection.preferred_api_version = new_version
+        db.session.commit()
+        
+        if old_version:
+            flash(f'API version updated from {old_version} to {new_version}', 'success')
+        else:
+            flash(f'API version set to {new_version}', 'success')
+    else:
+        flash('Please select a valid API version', 'error')
+    
+    return redirect(url_for('dashboard.salesforce'))
+
+@dashboard_bp.route('/refresh-api-versions', methods=['POST'])
+@login_required
+def refresh_api_versions():
+    """Manually refresh available API versions from Salesforce"""
+    customer = get_or_create_customer()
+    
+    if not customer.salesforce_connection:
+        flash('Please connect a Salesforce organization first', 'error')
+        return redirect(url_for('dashboard.salesforce'))
+    
+    try:
+        connection = customer.salesforce_connection
+        
+        # Force refresh by clearing the last updated timestamp
+        connection.api_versions_last_updated = None
+        db.session.commit()
+        
+        # Fetch new versions
+        available_versions = update_connection_api_versions(connection)
+        
+        if available_versions:
+            flash(f'Successfully refreshed API versions. Found {len(available_versions)} versions.', 'success')
+            
+            # If no preferred version is set, default to the latest
+            if not connection.preferred_api_version:
+                connection.preferred_api_version = available_versions[0]
+                db.session.commit()
+                flash(f'Set preferred API version to latest: {available_versions[0]}', 'info')
+        else:
+            flash('Unable to refresh API versions. Please try again later.', 'warning')
+    
+    except Exception as e:
+        current_app.logger.error(f"Error refreshing API versions: {e}")
+        flash('Error refreshing API versions. Please try again later.', 'error')
+    
+    return redirect(url_for('dashboard.salesforce'))
+
+@dashboard_bp.route('/api/available-versions')
+@login_required  
+def api_available_versions():
+    """API endpoint to get available API versions"""
+    customer = get_or_create_customer()
+    
+    if not customer.salesforce_connection:
+        return jsonify({'error': 'No Salesforce connection found'}), 400
+    
+    connection = customer.salesforce_connection
+    available_versions = connection.available_versions_list or []
+    
+    return jsonify({
+        'versions': available_versions,
+        'preferred_version': connection.preferred_api_version,
+        'last_updated': connection.api_versions_last_updated.isoformat() if connection.api_versions_last_updated else None
+    })
 
 @dashboard_bp.route('/health-checks')
 @login_required

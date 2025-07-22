@@ -77,7 +77,43 @@ class SalesforceConnection(db.Model):
     org_type = Column(String(50))  # Production, Sandbox, etc.
     is_sandbox = Column(Boolean, default=False)
     
+    # API Version Configuration
+    preferred_api_version = Column(String(10))  # e.g., "v59.0", defaults to latest if null
+    available_api_versions = Column(Text)  # JSON array of available versions
+    api_versions_last_updated = Column(DateTime)
+    
     customer = relationship("Customer", back_populates="salesforce_connection")
+    
+    @property
+    def available_versions_list(self):
+        """Get available API versions as a list."""
+        if self.available_api_versions:
+            import json
+            try:
+                return json.loads(self.available_api_versions)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return []
+    
+    @available_versions_list.setter
+    def available_versions_list(self, versions):
+        """Set available API versions from a list."""
+        import json
+        self.available_api_versions = json.dumps(versions) if versions else None
+        self.api_versions_last_updated = datetime.utcnow()
+    
+    def get_effective_api_version(self):
+        """Get the API version to use (preferred or latest available)."""
+        if self.preferred_api_version:
+            return self.preferred_api_version
+        
+        # If no preference set, use the latest available version
+        versions = self.available_versions_list
+        if versions:
+            return versions[0]  # Assuming versions are sorted newest first
+        
+        # Fallback to a reasonable default
+        return "v59.0"
 
 class HealthCheckHistory(db.Model):
     """Historical health check results for dashboard display"""

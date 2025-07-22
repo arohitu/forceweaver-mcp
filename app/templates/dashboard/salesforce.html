@@ -46,140 +46,226 @@
                     </div>
                 </div>
             </div>
+        </div>
+        
+        <!-- API Version Management Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-gear"></i> Salesforce API Version
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if api_version_form %}
+                    <div class="row">
+                        <div class="col-md-8">
+                            <p class="text-muted">
+                                Choose which Salesforce API version to use for health checks and data operations.
+                                <strong>{{ connection.get_effective_api_version() }}</strong> is currently being used.
+                            </p>
+                            
+                            <form method="POST" action="{{ url_for('dashboard.update_api_version') }}">
+                                {{ api_version_form.hidden_tag() }}
+                                
+                                <div class="mb-3">
+                                    {{ api_version_form.api_version.label(class="form-label") }}
+                                    {{ api_version_form.api_version(class="form-select") }}
+                                    
+                                    <div class="form-text">
+                                        <strong>Current:</strong> {{ connection.preferred_api_version or 'Latest (' + connection.get_effective_api_version() + ')' }}
+                                        {% if connection.api_versions_last_updated %}
+                                            <br><strong>Last Updated:</strong> {{ connection.api_versions_last_updated.strftime('%B %d, %Y at %I:%M %p') }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="btn-group" role="group">
+                                    {{ api_version_form.submit(class="btn btn-primary") }}
+                                    
+                                    <button type="button" class="btn btn-outline-secondary" 
+                                            onclick="refreshVersions()" id="refresh-btn">
+                                        <i class="bi bi-arrow-clockwise"></i> Refresh Versions
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">Available Versions</h6>
+                                    {% if connection.available_versions_list %}
+                                        <div class="small">
+                                            <strong>Latest 5 versions:</strong>
+                                            <ul class="list-unstyled mt-2">
+                                            {% for version in connection.available_versions_list[:5] %}
+                                                <li>
+                                                    <span class="badge bg-{{ 'primary' if version == connection.preferred_api_version else 'secondary' }} text-xs">
+                                                        {{ version }}
+                                                    </span>
+                                                    {% if version == connection.preferred_api_version %}
+                                                        <small class="text-muted">(current)</small>
+                                                    {% elif loop.first %}
+                                                        <small class="text-muted">(latest)</small>
+                                                    {% endif %}
+                                                </li>
+                                            {% endfor %}
+                                            </ul>
+                                            
+                                            {% if connection.available_versions_list|length > 5 %}
+                                                <small class="text-muted">
+                                                    ...and {{ connection.available_versions_list|length - 5 }} more versions
+                                                </small>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <p class="small text-muted">No versions loaded. Click "Refresh Versions" to load available API versions.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="row">
+                        <div class="col-12">
+                            <p class="text-muted">Loading available API versions from your Salesforce org...</p>
+                            <button type="button" class="btn btn-primary" onclick="refreshVersions()">
+                                <i class="bi bi-arrow-clockwise"></i> Load Available Versions
+                            </button>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Connection Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('dashboard.health_checks') }}" class="btn btn-success">
+                        <i class="bi bi-heart-pulse"></i> Run Health Check
+                    </a>
+                    <a href="{{ url_for('dashboard.api_keys') }}" class="btn btn-primary">
+                        <i class="bi bi-key"></i> Manage API Keys
+                    </a>
+                    <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-house"></i> Dashboard Home
+                    </a>
+                </div>
+            </div>
             <div class="card-footer">
                 <form action="{{ url_for('dashboard.disconnect_salesforce') }}" method="POST" class="d-inline">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                    <button type="submit" class="btn btn-danger" 
+                    <button type="submit" class="btn btn-danger btn-sm w-100" 
                             onclick="return confirm('Are you sure you want to disconnect from Salesforce? This will disable your API access.')">
                         <i class="bi bi-x-circle"></i> Disconnect
                     </button>
                 </form>
             </div>
         </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card">
+        
+        <!-- API Version Info Card -->
+        {% if connection.preferred_api_version %}
+        <div class="card mt-3">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Connection Info</h5>
+                <h6 class="mb-0"><i class="bi bi-code"></i> API Version Info</h6>
             </div>
             <div class="card-body">
-                <p class="text-muted">Your Salesforce organization is successfully connected. You can now:</p>
-                <ul class="list-unstyled">
-                    <li><i class="bi bi-check text-success"></i> Generate API keys</li>
-                    <li><i class="bi bi-check text-success"></i> Run health checks</li>
-                    <li><i class="bi bi-check text-success"></i> View health history</li>
-                </ul>
-                <div class="d-grid gap-2">
-                    <a href="{{ url_for('dashboard.api_keys') }}" class="btn btn-primary btn-sm">
-                        <i class="bi bi-key"></i> Manage API Keys
-                    </a>
-                    <form action="{{ url_for('dashboard.run_health_check') }}" method="POST">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <button type="submit" class="btn btn-success btn-sm w-100">
-                            <i class="bi bi-play-circle"></i> Run Health Check
-                        </button>
-                    </form>
-                </div>
+                <p class="small text-muted mb-2">Health checks will use:</p>
+                <p class="text-center">
+                    <span class="badge bg-primary fs-6">{{ connection.get_effective_api_version() }}</span>
+                </p>
+                <p class="small text-muted">
+                    Using the latest API version ensures access to newest features and optimal performance.
+                </p>
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 
 {% else %}
-<!-- No connection exists -->
-<div class="row">
+<!-- No Connection - Show Connection Form -->
+<div class="row justify-content-center">
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
-                    <i class="bi bi-cloud-plus"></i> Connect Your Salesforce Organization
+                    <i class="bi bi-cloud-plus"></i> Connect to Salesforce
                 </h5>
             </div>
             <div class="card-body">
-                <p class="text-muted">
-                    Connect your Salesforce organization to enable Revenue Cloud health monitoring and API access for AI agents.
+                <p class="text-muted mb-4">
+                    Connect your Salesforce organization to enable health checks and API access.
+                    Your credentials are encrypted and stored securely.
                 </p>
                 
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i>
-                    <strong>What happens when you connect?</strong>
-                    <ul class="mb-0 mt-2">
-                        <li>Secure OAuth 2.0 authentication with your Salesforce org</li>
-                        <li>Permission to read Revenue Cloud configuration data</li>
-                        <li>Ability to generate API keys for AI agent integration</li>
-                        <li>Access to comprehensive health check reports</li>
-                    </ul>
-                </div>
-                
-                <form action="{{ url_for('dashboard.connect_salesforce') }}" method="POST">
-                    {{ form.hidden_tag() }}
+                <form method="POST" action="{{ url_for('dashboard.connect_salesforce') }}">
+                    {{ connect_form.hidden_tag() }}
                     
-                    <div class="mb-3">
-                        {{ form.org_nickname.label(class="form-label") }}
-                        {{ form.org_nickname(class="form-control", placeholder="e.g., Production Org, Sandbox, etc.") }}
-                        {% if form.org_nickname.errors %}
-                            <div class="text-danger small">
-                                {% for error in form.org_nickname.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ connect_form.org_nickname.label(class="form-label") }}
+                                {{ connect_form.org_nickname(class="form-control", placeholder="My Salesforce Org") }}
+                                <div class="form-text">A friendly name to identify this organization</div>
                             </div>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mb-3">
-                        {{ form.environment.label(class="form-label") }}
-                        {{ form.environment(class="form-select") }}
-                        {% if form.environment.errors %}
-                            <div class="text-danger small">
-                                {% for error in form.environment.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ connect_form.environment.label(class="form-label") }}
+                                {{ connect_form.environment(class="form-select") }}
+                                <div class="form-text">Select your Salesforce environment type</div>
                             </div>
-                        {% endif %}
+                        </div>
                     </div>
                     
                     <div class="d-grid">
-                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                        {{ connect_form.submit(class="btn btn-primary btn-lg") }}
                     </div>
                 </form>
             </div>
         </div>
     </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-shield-check"></i> Security</h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Your connection is secured with:</p>
-                <ul class="list-unstyled">
-                    <li><i class="bi bi-lock text-success"></i> OAuth 2.0 with PKCE</li>
-                    <li><i class="bi bi-key text-success"></i> Encrypted token storage</li>
-                    <li><i class="bi bi-eye-slash text-success"></i> No password storage</li>
-                    <li><i class="bi bi-refresh text-success"></i> Secure token refresh</li>
-                </ul>
-                <small class="text-muted">
-                    We never store your Salesforce password. All tokens are encrypted and securely stored.
-                </small>
-            </div>
-        </div>
-        
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-question-circle"></i> Need Help?</h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small">Having trouble connecting?</p>
-                <ul class="small text-muted">
-                    <li>Make sure you have admin access to your Salesforce org</li>
-                    <li>Check that your org has Revenue Cloud enabled</li>
-                    <li>Ensure pop-ups are enabled for this site</li>
-                </ul>
-            </div>
-        </div>
-    </div>
 </div>
 {% endif %}
+
+<script>
+function refreshVersions() {
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Refreshing...';
+    }
+    
+    // Submit form to refresh versions
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{{ url_for("dashboard.refresh_api_versions") }}';
+    
+    // Add CSRF token
+    const csrfToken = document.createElement('input');
+    csrfToken.type = 'hidden';
+    csrfToken.name = 'csrf_token';
+    csrfToken.value = '{{ csrf_token() }}';
+    form.appendChild(csrfToken);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+</script>
+
+<style>
+.spin {
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
 {% endblock %} 
