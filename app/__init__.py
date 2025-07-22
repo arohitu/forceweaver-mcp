@@ -18,7 +18,11 @@ limiter = Limiter(key_func=get_remote_address)
 
 def create_app():
     """Application factory"""
-    app = Flask(__name__)
+    # Get the parent directory of the app package (project root)
+    import os
+    template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
+    
+    app = Flask(__name__, template_folder=template_dir)
     
     # Configuration
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
