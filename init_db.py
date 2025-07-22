@@ -68,13 +68,29 @@ def init_database():
                 connections_updated = 0
                 for connection in SalesforceConnection.query.all():
                     if not connection.preferred_api_version:
-                        # Set default to latest version
-                        connection.preferred_api_version = "v59.0"
+                        # Set default to more recent version
+                        connection.preferred_api_version = "v61.0"  # Summer '24 - more recent than v52.0
                         connections_updated += 1
+                        print(f"   Set default API version for {connection.salesforce_org_id}: v61.0")
+                        
+                        # Try to fetch real API versions if possible
+                        try:
+                            from app.services.salesforce_service import update_connection_api_versions
+                            print(f"   Attempting to fetch real API versions for {connection.salesforce_org_id}...")
+                            versions = update_connection_api_versions(connection, force_update=True)
+                            if versions:
+                                # Update preferred to latest if we got real versions
+                                connection.preferred_api_version = versions[0]
+                                print(f"   ✅ Updated to latest available version: {versions[0]}")
+                            else:
+                                print(f"   ⚠️  Keeping default version: {connection.preferred_api_version}")
+                        except Exception as version_error:
+                            print(f"   ⚠️  Could not fetch API versions: {version_error}")
+                            print(f"   Keeping default version: {connection.preferred_api_version}")
                 
                 if connections_updated > 0:
                     db.session.commit()
-                    print(f"   ✅ Updated {connections_updated} connections with default API version")
+                    print(f"   ✅ Updated {connections_updated} connections with API version settings")
             
             print(f"\n🎉 Database initialization completed successfully!")
             
