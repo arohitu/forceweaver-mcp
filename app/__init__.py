@@ -26,7 +26,7 @@ def create_app():
     
     # Configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-    app.config['DATABASE_URL'] = os.getenv('DATABASE_URL', 'sqlite:///instance/forceweaver.db')
+    database_url = os.getenv('DATABASE_URL', 'sqlite:///instance/forceweaver.db')
     app.config['FLASK_ENV'] = os.getenv('FLASK_ENV', 'production')
     
     # **Enhanced Flask session configuration for HTTPS**
@@ -35,9 +35,11 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
     app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
     
-    # Handle Heroku's postgres:// -> postgresql:// requirement
-    if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
-        app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
+    # Database configuration
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Rate limiting configuration
     app.config['RATELIMIT_STORAGE_URL'] = os.environ.get('REDIS_URL', 'memory://')
