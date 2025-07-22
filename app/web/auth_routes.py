@@ -60,22 +60,32 @@ def login():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         
+        current_app.logger.info(f"Login attempt for email: {email}")
+        
         if not email or not password:
             flash('Email and password are required.', 'error')
             return render_template('auth/login.html')
         
         user = User.query.filter_by(email=email).first()
+        current_app.logger.info(f"User found: {bool(user)}")
         
         if user and user.check_password(password):
+            current_app.logger.info(f"Password check passed for user: {user.email}")
             if user.is_active:
+                current_app.logger.info("User is active, attempting login_user")
                 login_user(user)
+                current_app.logger.info(f"login_user completed, current_user authenticated: {current_user.is_authenticated if current_user else 'No current_user'}")
+                
                 next_page = request.args.get('next')
                 if not next_page or not next_page.startswith('/'):
                     next_page = url_for('dashboard.index')
+                current_app.logger.info(f"Redirecting to: {next_page}")
                 return redirect(next_page)
             else:
+                current_app.logger.warning(f"User {user.email} is not active")
                 flash('Your account has been deactivated. Please contact support.', 'error')
         else:
+            current_app.logger.warning(f"Authentication failed for email: {email}")
             flash('Invalid email or password.', 'error')
     
     return render_template('auth/login.html')

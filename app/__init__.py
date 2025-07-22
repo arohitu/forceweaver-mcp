@@ -77,7 +77,7 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         from app.models.user import User
-        return User.query.get(user_id)
+        return db.session.get(User, user_id)  # Updated to use modern SQLAlchemy syntax
     
     # Logging configuration
     if not app.debug:
