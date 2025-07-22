@@ -1,15 +1,16 @@
 """
-Main web routes for the ForceWeaver MCP Server
+Main routes for the ForceWeaver MCP Server
 """
 from flask import Blueprint, render_template, current_app
-from flask_login import current_user
+from app import get_current_user
 
 bp = Blueprint('main', __name__)
 
 @bp.route('/')
 def index():
-    """Landing page"""
-    return render_template('main/index.html')
+    """Homepage"""
+    user = get_current_user()
+    return render_template('main/index.html', user=user)
 
 @bp.route('/pricing')
 def pricing():
