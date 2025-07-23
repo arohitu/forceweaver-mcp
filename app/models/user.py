@@ -63,6 +63,21 @@ class User(db.Model):
             print(f"Password check error: {e}")
             return False
     
+    # Authentication properties for template compatibility
+    @property
+    def is_authenticated(self):
+        """Return True if user is authenticated (always True for valid User objects)"""
+        return True
+    
+    @property
+    def is_anonymous(self):
+        """Return True if user is anonymous (always False for User objects)"""
+        return False
+    
+    def get_id(self):
+        """Return user ID as string for session management"""
+        return str(self.id)
+    
     @classmethod
     def create_user(cls, email, name, password):
         """Create a new user"""

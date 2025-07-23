@@ -47,12 +47,19 @@ def login():
                         login_user(user)
                         current_app.logger.info(f"Session after login: {dict(session)}")
                         
-                        # Redirect to next page or dashboard
-                        next_page = request.args.get('next')
+                        # Get next page from form or URL parameter
+                        next_page = request.form.get('next') or request.args.get('next')
+                        current_app.logger.info(f"Next page from request: {next_page}")
+                        
+                        # Validate and construct redirect URL
                         if not next_page or not next_page.startswith('/'):
-                            next_page = '/dashboard/'
+                            next_page = url_for('dashboard.index')
                         
                         current_app.logger.info(f"Login successful, redirecting to: {next_page}")
+                        
+                        # Force session to be saved before redirect
+                        session.permanent = True
+                        
                         return redirect(next_page)
                     else:
                         current_app.logger.warning("User account is inactive")

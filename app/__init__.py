@@ -31,13 +31,31 @@ def logout_user():
 def get_current_user():
     """Get current authenticated user or None"""
     if not session.get('authenticated'):
-        return None
+        return AnonymousUser()
 
     from app.models.user import User
     user_id = session.get('user_id')
     if user_id:
-        return User.query.get(user_id)
-    return None
+        user = User.query.get(user_id)
+        return user if user else AnonymousUser()
+    return AnonymousUser()
+
+class AnonymousUser:
+    """Anonymous user for template compatibility"""
+    @property
+    def is_authenticated(self):
+        return False
+    
+    @property
+    def is_anonymous(self):
+        return True
+    
+    @property
+    def is_active(self):
+        return False
+    
+    def get_id(self):
+        return None
 
 def login_required(f):
     """Decorator for routes that require authentication"""
@@ -69,17 +87,25 @@ def create_app():
     is_production = os.getenv('FLASK_ENV') == 'production' or 'herokuapp.com' in os.getenv('SERVER_NAME', '')
     
     if is_production:
-        # Production HTTPS settings
+        # Production HTTPS settings - Fixed for proper session handling
         app.config['SESSION_COOKIE_SECURE'] = True   # Require HTTPS for cookies
         app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
         app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+        app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow for proper domain handling
+        app.config['SESSION_COOKIE_PATH'] = '/'  # Ensure cookies work across all paths
     else:
         # Development HTTP settings
         app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP for development
         app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent XSS
         app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+        app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow for proper domain handling
+        app.config['SESSION_COOKIE_PATH'] = '/'  # Ensure cookies work across all paths
     
     app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
+    
+    # Additional session configuration for better reliability
+    app.config['SESSION_TYPE'] = 'filesystem'  # Use filesystem for session storage
+    app.config['SESSION_PERMANENT'] = False  # Let login_user control permanence
 
     # Database configuration
     if database_url.startswith('postgres://'):
